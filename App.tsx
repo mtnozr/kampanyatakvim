@@ -367,14 +367,62 @@ function App() {
 
     try {
       addToast('PDF hazırlanıyor...', 'info');
-      const canvas = await html2canvas(calendarElement, {
-        scale: 2, // Higher quality
-        backgroundColor: '#F8F9FE', // Match page bg
-        useCORS: true // For avatars/images if needed
+
+      // 1. Create a clone to manipulate for export
+      const clone = calendarElement.cloneNode(true) as HTMLElement;
+
+      // 2. Wrap it in a container that forces a large width (for landscape) 
+      //    and white background.
+      const container = document.createElement('div');
+      container.style.width = '1600px';
+      container.style.position = 'absolute';
+      container.style.top = '-9999px';
+      container.style.left = '-9999px';
+      container.style.backgroundColor = '#ffffff';
+      container.style.padding = '20px';
+      container.style.fontFamily = 'Inter, sans-serif';
+
+      // 3. Add Header Details directly to HTML (Fixes Turkish char issues in PDF Text)
+      const headerTitle = document.createElement('h2');
+      headerTitle.innerText = `Kampanya Takvimi - ${format(currentDate, 'MMMM yyyy', { locale: tr })}`;
+      headerTitle.style.marginBottom = '10px';
+      headerTitle.style.textAlign = 'left';
+      headerTitle.style.fontSize = '24px';
+      headerTitle.style.color = '#333';
+
+      const headerDate = document.createElement('p');
+      headerDate.innerText = `Oluşturulma Tarihi: ${format(new Date(), 'dd.MM.yyyy HH:mm')}`;
+      headerDate.style.marginBottom = '20px';
+      headerDate.style.textAlign = 'right';
+      headerDate.style.fontSize = '12px';
+      headerDate.style.color = '#666';
+
+      container.appendChild(headerTitle);
+      container.appendChild(headerDate);
+      container.appendChild(clone);
+      document.body.appendChild(container);
+
+      // 4. Force full height for all scrollable containers in the clone
+      const scrollables = clone.querySelectorAll('.event-scroll');
+      scrollables.forEach((el) => {
+        (el as HTMLElement).style.overflow = 'visible';
+        (el as HTMLElement).style.height = 'auto';
+        (el as HTMLElement).style.maxHeight = 'none';
       });
 
+      // 5. Capture the container
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true
+      });
+
+      // 6. Clean up
+      document.body.removeChild(container);
+
+      // 7. Generate PDF
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('l', 'mm', 'a4'); // Landscape, mm, A4
+      const pdf = new jsPDF('l', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
@@ -386,11 +434,6 @@ function App() {
       const imgY = 10; // Top margin
 
       pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-
-      // Add Title / Context
-      pdf.setFontSize(10);
-      pdf.text(`Kampanya Takvimi - ${format(currentDate, 'MMMM yyyy', { locale: tr })}`, 10, 7);
-      pdf.text(`Oluşturulma Tarihi: ${format(new Date(), 'dd.MM.yyyy HH:mm')}`, pdfWidth - 60, 7);
 
       pdf.save(`kampanya-takvimi-${format(currentDate, 'yyyy-MM')}.pdf`);
       addToast('PDF indirildi.', 'success');
