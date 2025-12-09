@@ -31,20 +31,25 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
       setDateStr(formattedDate);
       checkHoliday(formattedDate);
     } else {
-        setTitle('');
-        setUrgency('Medium');
-        setAssigneeId('');
-        setDepartmentId('');
-        setDescription('');
-        setHolidayWarning(null);
+      setTitle('');
+      setUrgency('Medium');
+      setAssigneeId('');
+      setDepartmentId('');
+      setDescription('');
+      setHolidayWarning(null);
     }
   }, [isOpen, initialDate]);
 
   const checkHoliday = (date: string) => {
+    const d = new Date(date);
+    const dayOfWeek = d.getDay(); // 0 = Sunday, 6 = Saturday
+
     if (TURKISH_HOLIDAYS[date]) {
-        setHolidayWarning(TURKISH_HOLIDAYS[date]);
+      setHolidayWarning(TURKISH_HOLIDAYS[date]);
+    } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+      setHolidayWarning('Hafta Sonu');
     } else {
-        setHolidayWarning(null);
+      setHolidayWarning(null);
     }
   };
 
@@ -57,7 +62,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !dateStr) return;
-    
+
     const selectedDate = new Date(dateStr);
     onAdd(title, urgency, selectedDate, assigneeId || undefined, description, departmentId || undefined);
     onClose();
@@ -82,15 +87,15 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
 
         {/* Holiday Warning Popup Inside Modal */}
         {holidayWarning && (
-            <div className="bg-amber-50 border-b border-amber-200 p-4 flex items-start gap-3 animate-in slide-in-from-top-2">
-                <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
-                <div>
-                    <h4 className="font-bold text-amber-800 text-sm">Resmi Tatil Uyarısı</h4>
-                    <p className="text-amber-700 text-xs mt-1">
-                        Seçilen tarih <strong>{holidayWarning}</strong> gününe denk gelmektedir.
-                    </p>
-                </div>
+          <div className="bg-amber-50 border-b border-amber-200 p-4 flex items-start gap-3 animate-in slide-in-from-top-2">
+            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+            <div>
+              <h4 className="font-bold text-amber-800 text-sm">Resmi Tatil Uyarısı</h4>
+              <p className="text-amber-700 text-xs mt-1">
+                Seçilen tarih <strong>{holidayWarning}</strong> gününe denk gelmektedir.
+              </p>
             </div>
+          </div>
         )}
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
@@ -118,39 +123,39 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Görev Atanan</label>
-                <div className="relative">
-                  <select
-                    value={assigneeId}
-                    onChange={(e) => setAssigneeId(e.target.value)}
-                    className="w-full px-3 py-2 pl-8 rounded-lg border border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all appearance-none bg-white text-sm"
-                  >
-                    <option value="">Seçiniz</option>
-                    {users.map(user => (
-                      <option key={user.id} value={user.id}>{user.name}</option>
-                    ))}
-                  </select>
-                  <UserPlus className="absolute left-2.5 top-2.5 text-gray-400" size={16} />
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Görev Atanan</label>
+              <div className="relative">
+                <select
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  className="w-full px-3 py-2 pl-8 rounded-lg border border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all appearance-none bg-white text-sm"
+                >
+                  <option value="">Seçiniz</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>{user.name}</option>
+                  ))}
+                </select>
+                <UserPlus className="absolute left-2.5 top-2.5 text-gray-400" size={16} />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Talep Eden Birim</label>
-                <div className="relative">
-                  <select
-                    value={departmentId}
-                    onChange={(e) => setDepartmentId(e.target.value)}
-                    className="w-full px-3 py-2 pl-8 rounded-lg border border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all appearance-none bg-white text-sm"
-                  >
-                    <option value="">Seçiniz</option>
-                    {departments.map(dept => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
-                    ))}
-                  </select>
-                  <Building className="absolute left-2.5 top-2.5 text-gray-400" size={16} />
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Talep Eden Birim</label>
+              <div className="relative">
+                <select
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value)}
+                  className="w-full px-3 py-2 pl-8 rounded-lg border border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all appearance-none bg-white text-sm"
+                >
+                  <option value="">Seçiniz</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                  ))}
+                </select>
+                <Building className="absolute left-2.5 top-2.5 text-gray-400" size={16} />
               </div>
+            </div>
           </div>
 
           <div>
@@ -168,8 +173,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
                     onClick={() => setUrgency(level)}
                     className={`
                       px-3 py-2 rounded-lg text-sm font-medium text-left border transition-all
-                      ${isSelected 
-                        ? `${config.colorBg} ${config.colorBorder} border ring-1 ring-offset-1 ring-gray-300` 
+                      ${isSelected
+                        ? `${config.colorBg} ${config.colorBorder} border ring-1 ring-offset-1 ring-gray-300`
                         : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}
                     `}
                   >
