@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityLog } from '../types';
 import { format } from 'date-fns';
-import tr from 'date-fns/locale/tr';
+import { tr } from 'date-fns/locale';
 import { ClipboardList, Clock } from 'lucide-react';
 
 interface LogPopoverProps {
@@ -18,19 +18,19 @@ export const LogPopover: React.FC<LogPopoverProps> = ({ logs, isOpen, onClose, o
     <div className="absolute top-16 right-16 md:right-32 z-50 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
         <div className="flex items-center gap-2 text-gray-700">
-           <ClipboardList size={18} />
-           <h3 className="font-bold">İşlem Kütüğü</h3>
+          <ClipboardList size={18} />
+          <h3 className="font-bold">İşlem Kütüğü</h3>
         </div>
         {logs.length > 0 && (
-          <button 
-            onClick={onClear} 
+          <button
+            onClick={onClear}
             className="text-xs text-red-500 hover:text-red-700 font-medium"
           >
             Temizle
           </button>
         )}
       </div>
-      
+
       <div className="max-h-[300px] overflow-y-auto">
         {logs.length === 0 ? (
           <div className="p-8 text-center text-gray-400">

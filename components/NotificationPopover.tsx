@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppNotification } from '../types';
 import { format } from 'date-fns';
-import tr from 'date-fns/locale/tr';
+import { tr } from 'date-fns/locale';
 import { Mail, Bell } from 'lucide-react';
 
 interface NotificationPopoverProps {
@@ -19,15 +19,15 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ notifi
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
         <h3 className="font-bold text-gray-700">Bildirimler</h3>
         {notifications.length > 0 && (
-          <button 
-            onClick={onMarkAllRead} 
+          <button
+            onClick={onMarkAllRead}
             className="text-xs text-violet-600 hover:text-violet-800 font-medium"
           >
             Tümünü Temizle
           </button>
         )}
       </div>
-      
+
       <div className="max-h-[300px] overflow-y-auto">
         {notifications.length === 0 ? (
           <div className="p-8 text-center text-gray-400">
