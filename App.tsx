@@ -567,16 +567,16 @@ function App() {
                 )}
               </button>
 
+              <button
+                onClick={() => setIsAdminOpen(true)}
+                className="p-2 text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-colors bg-white border border-gray-100 rounded-lg shadow-sm"
+                title="Yönetici Paneli"
+              >
+                <Users size={20} />
+              </button>
+
               {isDesigner && (
                 <>
-                  <button
-                    onClick={() => setIsAdminOpen(true)}
-                    className="p-2 text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-colors bg-white border border-gray-100 rounded-lg shadow-sm"
-                    title="Yönetici Paneli"
-                  >
-                    <Users size={20} />
-                  </button>
-
                   <div className="relative">
                     <button
                       onClick={() => {
@@ -640,150 +640,189 @@ function App() {
                   </button>
                 </>
               )}
-            </div>
-          </div>
 
-          {/* Search Bar Panel */}
-          {isSearchOpen && (
-            <div className="bg-white p-4 rounded-2xl shadow-lg border border-violet-100 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4">
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Başlık veya Ref ID ile ara..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none transition-all text-sm"
+                <button
+                  onClick={() => {
+                    setIsNotifOpen(!isNotifOpen);
+                    setIsLogOpen(false);
+                  }}
+                  className={`
+                                    p-2 transition-colors bg-white border border-gray-100 rounded-lg shadow-sm
+                                    ${isNotifOpen ? 'text-violet-600 bg-violet-50' : 'text-gray-400 hover:text-violet-600'}
+                                `}
+                >
+                  <Bell size={20} />
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                <NotificationPopover
+                  isOpen={isNotifOpen}
+                  notifications={notifications}
+                  onClose={() => setIsNotifOpen(false)}
+                  onMarkAllRead={() => {
+                    notifications.forEach(n => deleteDoc(doc(db, "notifications", n.id)));
+                  }}
                 />
               </div>
 
-              <div className="relative">
-                <Filter className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                <select
-                  value={filterAssignee}
-                  onChange={(e) => setFilterAssignee(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none transition-all text-sm appearance-none"
-                >
-                  <option value="">Tüm Personel</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="relative">
-                <div className="absolute left-3 top-2.5 w-4 h-4 rounded-full border-2 border-gray-300"></div>
-                <select
-                  value={filterUrgency}
-                  onChange={(e) => setFilterUrgency(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none transition-all text-sm appearance-none"
-                >
-                  <option value="">Tüm Öncelikler</option>
-                  {(Object.keys(URGENCY_CONFIGS) as UrgencyLevel[]).map(level => (
-                    <option key={level} value={level}>{URGENCY_CONFIGS[level].label}</option>
-                  ))}
-                </select>
-              </div>
-
               <button
-                onClick={clearFilters}
-                disabled={!hasActiveFilters}
-                className={`
+                onClick={() => openAddModal()}
+                className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 transition-transform active:scale-95"
+              >
+                <Plus size={18} />
+                <span>Ekle</span>
+              </button>
+            </>
+              )}
+          </div>
+        </div>
+
+        {/* Search Bar Panel */}
+        {isSearchOpen && (
+          <div className="bg-white p-4 rounded-2xl shadow-lg border border-violet-100 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+              <input
+                type="text"
+                placeholder="Başlık veya Ref ID ile ara..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none transition-all text-sm"
+              />
+            </div>
+
+            <div className="relative">
+              <Filter className="absolute left-3 top-2.5 text-gray-400" size={18} />
+              <select
+                value={filterAssignee}
+                onChange={(e) => setFilterAssignee(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none transition-all text-sm appearance-none"
+              >
+                <option value="">Tüm Personel</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative">
+              <div className="absolute left-3 top-2.5 w-4 h-4 rounded-full border-2 border-gray-300"></div>
+              <select
+                value={filterUrgency}
+                onChange={(e) => setFilterUrgency(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none transition-all text-sm appearance-none"
+              >
+                <option value="">Tüm Öncelikler</option>
+                {(Object.keys(URGENCY_CONFIGS) as UrgencyLevel[]).map(level => (
+                  <option key={level} value={level}>{URGENCY_CONFIGS[level].label}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className={`
                             flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
                             ${hasActiveFilters
-                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'}
+                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'}
                         `}
-              >
-                <X size={16} /> Filtreleri Temizle
-              </button>
-            </div>
-          )}
-        </div>
+            >
+              <X size={16} /> Filtreleri Temizle
+            </button>
+          </div>
+        )}
+      </div>
 
-        {/* Calendar Grid Header */}
-        <div className="grid grid-cols-7 gap-4 mb-4">
-          {DAYS_OF_WEEK.map(day => (
-            <div key={day} className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-              {day}
-            </div>
-          ))}
-        </div>
+      {/* Calendar Grid Header */}
+      <div className="grid grid-cols-7 gap-4 mb-4">
+        {DAYS_OF_WEEK.map(day => (
+          <div key={day} className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+            {day}
+          </div>
+        ))}
+      </div>
 
-        {/* Calendar Grid Body */}
-        <div className="grid grid-cols-7 gap-4 flex-1 auto-rows-fr">
-          {calendarDays.map((day) => {
-            const isCurrentMonth = isSameMonth(day, currentDate);
-            const isTodayDate = isToday(day);
-            const isDayWeekend = isWeekend(day);
-            const dayEvents = getEventsForDay(day);
-            const holidayName = getHolidayName(day);
-            const isHoliday = !!holidayName;
+      {/* Calendar Grid Body */}
+      <div className="grid grid-cols-7 gap-4 flex-1 auto-rows-fr">
+        {calendarDays.map((day) => {
+          const isCurrentMonth = isSameMonth(day, currentDate);
+          const isTodayDate = isToday(day);
+          const isDayWeekend = isWeekend(day);
+          const dayEvents = getEventsForDay(day);
+          const holidayName = getHolidayName(day);
+          const isHoliday = !!holidayName;
 
-            return (
-              <div
-                key={day.toString()}
-                onClick={() => openAddModal(day)}
-                className={`
+          return (
+            <div
+              key={day.toString()}
+              onClick={() => openAddModal(day)}
+              className={`
                   relative min-h-[120px] p-2 rounded-2xl border transition-all duration-200 group
                   flex flex-col
                   ${isCurrentMonth
-                    ? (isHoliday
-                      ? 'bg-red-50/70 border-red-200 shadow-sm'
-                      : isDayWeekend
-                        ? 'bg-gray-100 border-gray-200 shadow-sm'
-                        : 'bg-white border-transparent shadow-sm hover:shadow-md')
-                    : 'bg-gray-50/50 border-transparent opacity-60'}
+                  ? (isHoliday
+                    ? 'bg-red-50/70 border-red-200 shadow-sm'
+                    : isDayWeekend
+                      ? 'bg-gray-100 border-gray-200 shadow-sm'
+                      : 'bg-white border-transparent shadow-sm hover:shadow-md')
+                  : 'bg-gray-50/50 border-transparent opacity-60'}
                   ${isTodayDate ? 'ring-2 ring-violet-400 ring-offset-2' : ''}
                   ${!isDesigner ? 'cursor-default' : 'cursor-pointer'}
                 `}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  {isHoliday && isCurrentMonth ? (
-                    <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded leading-tight max-w-[65%] line-clamp-2">
-                      {holidayName}
-                    </span>
-                  ) : <div></div>}
+            >
+              <div className="flex justify-between items-start mb-2">
+                {isHoliday && isCurrentMonth ? (
+                  <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded leading-tight max-w-[65%] line-clamp-2">
+                    {holidayName}
+                  </span>
+                ) : <div></div>}
 
-                  <span className={`
+                <span className={`
                     text-sm font-bold w-8 h-8 flex items-center justify-center rounded-full
                     ${isTodayDate
-                      ? 'bg-violet-600 text-white'
-                      : isHoliday && isCurrentMonth ? 'text-red-600'
-                        : isCurrentMonth ? 'text-gray-700' : 'text-gray-400'}
+                    ? 'bg-violet-600 text-white'
+                    : isHoliday && isCurrentMonth ? 'text-red-600'
+                      : isCurrentMonth ? 'text-gray-700' : 'text-gray-400'}
                   `}>
-                    {format(day, 'd')}
-                  </span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto event-scroll">
-                  {dayEvents.map(event => (
-                    <EventBadge
-                      key={event.id}
-                      event={event}
-                      user={users.find(u => u.id === event.assigneeId)}
-                      onClick={setViewEvent}
-                    />
-                  ))}
-                </div>
-
-                {isDesigner && (
-                  <>
-                    <div className="absolute inset-0 bg-violet-50/0 group-hover:bg-violet-50/30 rounded-2xl pointer-events-none transition-colors" />
-                    <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-white p-1 rounded-full shadow-sm text-violet-500">
-                        <Plus size={14} />
-                      </div>
-                    </div>
-                  </>
-                )}
+                  {format(day, 'd')}
+                </span>
               </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* Network / IP Simulation Tool (Floating Bottom Right) */}
+              <div className="flex-1 overflow-y-auto event-scroll">
+                {dayEvents.map(event => (
+                  <EventBadge
+                    key={event.id}
+                    event={event}
+                    user={users.find(u => u.id === event.assigneeId)}
+                    onClick={setViewEvent}
+                  />
+                ))}
+              </div>
+
+              {isDesigner && (
+                <>
+                  <div className="absolute inset-0 bg-violet-50/0 group-hover:bg-violet-50/30 rounded-2xl pointer-events-none transition-colors" />
+                  <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="bg-white p-1 rounded-full shadow-sm text-violet-500">
+                      <Plus size={14} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+      {/* Network / IP Simulation Tool (Floating Bottom Right) */ }
       <div className="fixed bottom-4 left-4 z-40">
         <button
           onClick={() => setIsIpSimOpen(!isIpSimOpen)}
@@ -862,7 +901,7 @@ function App() {
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-    </div>
+    </div >
   );
 }
 
