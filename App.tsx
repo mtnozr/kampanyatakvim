@@ -410,12 +410,14 @@ function App() {
         (el as HTMLElement).style.maxHeight = 'none';
       });
 
-      // 5. Expand text truncation for export (Remove line-clamp)
-      const clampedTexts = clone.querySelectorAll('.line-clamp-2');
+      // 5. Expand text truncation for export (Remove line-clamp and truncate)
+      const clampedTexts = clone.querySelectorAll('.line-clamp-2, .truncate');
       clampedTexts.forEach((el) => {
         el.classList.remove('line-clamp-2');
-        (el as HTMLElement).style.display = 'block'; // Ensure full block display
+        el.classList.remove('truncate');
+        (el as HTMLElement).style.display = 'block';
         (el as HTMLElement).style.overflow = 'visible';
+        (el as HTMLElement).style.whiteSpace = 'normal'; // Allow wrapping
       });
 
       // 6. Capture the container
