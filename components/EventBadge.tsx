@@ -7,9 +7,17 @@ interface EventBadgeProps {
   event: CalendarEvent;
   user?: User;
   onClick: (event: CalendarEvent) => void;
+  isBlurred?: boolean;
+  isClickable?: boolean;
 }
 
-export const EventBadge: React.FC<EventBadgeProps> = ({ event, user, onClick }) => {
+export const EventBadge: React.FC<EventBadgeProps> = ({
+  event,
+  user,
+  onClick,
+  isBlurred = false,
+  isClickable = true
+}) => {
   const config = URGENCY_CONFIGS[event.urgency];
 
   const renderAvatar = () => {
@@ -31,9 +39,9 @@ export const EventBadge: React.FC<EventBadgeProps> = ({ event, user, onClick }) 
 
     if (user.avatarUrl) {
       return (
-        <img 
-          src={user.avatarUrl} 
-          alt={user.name} 
+        <img
+          src={user.avatarUrl}
+          alt={user.name}
           className="w-5 h-5 rounded-full border border-white shadow-sm object-cover bg-gray-200 shrink-0"
         />
       );
@@ -41,40 +49,47 @@ export const EventBadge: React.FC<EventBadgeProps> = ({ event, user, onClick }) 
 
     // Fallback if neither emoji nor url
     return (
-       <div className="w-5 h-5 rounded-full border border-white shadow-sm bg-violet-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
-         {user.name.charAt(0)}
-       </div>
+      <div className="w-5 h-5 rounded-full border border-white shadow-sm bg-violet-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
+        {user.name.charAt(0)}
+      </div>
     );
   };
 
   return (
-    <div 
+    <div
       onClick={(e) => {
-        e.stopPropagation(); // Prevent triggering the parent cell's "Add Event" modal
-        onClick(event);
+        e.stopPropagation();
+        if (isClickable && !isBlurred) {
+          onClick(event);
+        }
       }}
-      className="flex flex-col gap-1 mb-2 group cursor-pointer transition-transform hover:scale-[1.02]"
+      className={`
+        flex flex-col gap-1 mb-2 group transition-transform 
+        ${isClickable && !isBlurred ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-default'}
+        ${isBlurred ? 'opacity-70 grayscale' : ''}
+      `}
     >
       {/* Assigned User Info (Avatar + Name) */}
       <div className="flex items-center gap-1.5 px-1 min-w-0">
-        {renderAvatar()}
+        {!isBlurred && renderAvatar()}
         <span className="text-[10px] text-gray-500 font-medium truncate leading-none">
-          {user ? user.name : 'Atanmadı'}
+          {isBlurred ? '🔒 Dolu' : (user ? user.name : 'Atanmadı')}
         </span>
       </div>
-      
+
       {/* The Colored Card */}
       <div className={`
         ${config.colorBg} 
         border-l-4 ${config.colorBorder} 
         rounded-r-md rounded-l-sm p-1.5 shadow-sm
         flex flex-col gap-0.5
+        ${isBlurred ? 'blur-[3px] select-none' : ''}
       `}>
         <span className={`text-[9px] font-bold uppercase tracking-wide opacity-80 ${config.colorText}`}>
-          {config.label}
+          {isBlurred ? '---' : config.label}
         </span>
         <span className={`text-[11px] font-semibold leading-tight ${config.colorText} line-clamp-2`}>
-          {event.title}
+          {isBlurred ? 'Diğer Birim Kampanyası' : event.title}
         </span>
       </div>
     </div>

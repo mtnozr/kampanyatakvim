@@ -234,14 +234,7 @@ function App() {
   // --- Filter Logic ---
   const filteredEvents = useMemo(() => {
     return events.filter(event => {
-      // 1. IP Access Control Filter
-      if (userRole === 'department_user') {
-        if (event.departmentId !== currentDepartmentId) {
-          return false;
-        }
-      }
-
-      // 2. Search & UI Filters
+      // 1. Search & UI Filters ONLY (Access control is handled at render time)
       const query = searchQuery.toLowerCase();
       const matchesSearch =
         event.title.toLowerCase().includes(query) ||
@@ -249,9 +242,15 @@ function App() {
 
       const matchesAssignee = filterAssignee ? event.assigneeId === filterAssignee : true;
       const matchesUrgency = filterUrgency ? event.urgency === filterUrgency : true;
+
+      // If a department user searches, they shouldn't find blurred events by content content,
+      // but we still need them in the list to render them as "blurred".
+      // So if search is active, we might need to filter strict. 
+      // BUT for now, let's allow basic filtering and handle "blur" logic in rendering loop.
+
       return matchesSearch && matchesAssignee && matchesUrgency;
     });
-  }, [events, searchQuery, filterAssignee, filterUrgency, userRole, currentDepartmentId]);
+  }, [events, searchQuery, filterAssignee, filterUrgency]);
 
   // --- Calendar Logic ---
   const calendarDays = useMemo(() => {
@@ -759,14 +758,49 @@ function App() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto event-scroll">
-                  {dayEvents.map(event => (
-                    <EventBadge
-                      key={event.id}
-                      event={event}
-                      user={users.find(u => u.id === event.assigneeId)}
-                      onClick={setViewEvent}
-                    />
-                  ))}
+                  {dayEvents.map(event => {
+                    // Visibility Logic
+                    const isMyDeptInfo = currentDepartmentId && event.departmentId === currentDepartmentId;
+
+                    // Designer: Everything clear, everything clickable
+                    // Department User: 
+                    //    - Own Dept: Clear, NOT clickable (read-only)
+                    //    - Other Dept: Blurred, NOT clickable
+                    // Guest: Blurred, NOT clickable
+
+                    let isBlurred = false;
+                    let isClickable = false;
+
+                    if (isDesigner) {
+                      isBlurred = false;
+                      isClickable = true;
+                    } else if (userRole === 'department_user') {
+                      if (isMyDeptInfo) {
+                        // My department: Clear but Read-Only
+                        isBlurred = false;
+                        isClickable = false;
+                      } else {
+                        // Other department: Blurred and Read-Only
+                        isBlurred = true;
+                        isClickable = false;
+                      }
+                    } else {
+                      // Guest
+                      isBlurred = true;
+                      isClickable = false;
+                    }
+
+                    return (
+                      <EventBadge
+                        key={event.id}
+                        event={event}
+                        user={users.find(u => u.id === event.assigneeId)}
+                        onClick={setViewEvent}
+                        isBlurred={isBlurred}
+                        isClickable={isClickable}
+                      />
+                    );
+                  })}
                 </div>
 
                 {isDesigner && (
