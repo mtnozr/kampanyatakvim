@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { X, Trash2, Plus, ShieldCheck, Lock, Users, Calendar, AlertTriangle, Building, Network } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Trash2, Plus, ShieldCheck, Lock, Users, Calendar, AlertTriangle, Building, Network, LogOut } from 'lucide-react';
 import { User, CalendarEvent, Department, IpAccessConfig } from '../types';
 import { AVAILABLE_EMOJIS, URGENCY_CONFIGS } from '../constants';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -36,9 +38,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   ipConfig,
   onUpdateIpConfig
 }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'users' | 'events' | 'departments' | 'access'>('users');
+
+  // Loading state for auth check
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // User Form States
   const [newName, setNewName] = useState('');
@@ -58,13 +64,38 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Delete All Confirmation State
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === '1234') {
-      setIsAuthenticated(true);
-      setError('');
-    } else {
-      setError('Hatalı şifre!');
+    setError('');
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Success is handled by onAuthStateChanged
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        setError('Hatalı e-posta veya şifre.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Çok fazla başarısız deneme. Lütfen bekleyin.');
+      } else {
+        setError('Giriş yapılamadı: ' + err.message);
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -163,36 +194,53 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             <ShieldCheck className="text-violet-600" size={24} />
             <h2 className="text-lg font-bold">Yönetici Paneli</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {authUser && (
+              <button
+                onClick={handleLogout}
+                className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-medium hover:bg-red-100 flex items-center gap-1"
+              >
+                <LogOut size={14} /> Çıkış
+              </button>
+            )}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        {!isAuthenticated ? (
+        {!authUser ? (
           // Login View
           <form onSubmit={handleLogin} className="p-8 flex flex-col gap-4 items-center justify-center flex-1">
             <div className="p-4 bg-violet-50 rounded-full text-violet-500 mb-2">
               <Lock size={32} />
             </div>
-            <h3 className="text-xl font-semibold text-gray-800">Giriş Yapın</h3>
+            <h3 className="text-xl font-semibold text-gray-800">Admin Girişi</h3>
             <p className="text-sm text-gray-500 text-center max-w-xs">
-              Yönetim paneline erişmek için şifreyi giriniz.
+              Yönetim paneline erişmek için yetkili e-posta ve şifrenizi giriniz.
             </p>
 
-            <div className="w-full max-w-xs space-y-2">
+            <div className="w-full max-w-xs space-y-3">
+              <input
+                type="email"
+                placeholder="E-posta"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm"
+                autoFocus
+              />
               <input
                 type="password"
                 placeholder="Şifre"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-center tracking-widest"
-                autoFocus
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm"
               />
-              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg text-center">{error}</div>}
             </div>
 
-            <button type="submit" className="w-full max-w-xs bg-violet-600 text-white py-2 rounded-lg font-medium hover:bg-violet-700 transition">
-              Giriş
+            <button type="submit" className="w-full max-w-xs bg-violet-600 text-white py-2 rounded-lg font-medium hover:bg-violet-700 transition shadow-lg shadow-violet-200 mt-2">
+              Giriş Yap
             </button>
           </form>
         ) : (
