@@ -410,7 +410,15 @@ function App() {
         (el as HTMLElement).style.maxHeight = 'none';
       });
 
-      // 5. Capture the container
+      // 5. Expand text truncation for export (Remove line-clamp)
+      const clampedTexts = clone.querySelectorAll('.line-clamp-2');
+      clampedTexts.forEach((el) => {
+        el.classList.remove('line-clamp-2');
+        (el as HTMLElement).style.display = 'block'; // Ensure full block display
+        (el as HTMLElement).style.overflow = 'visible';
+      });
+
+      // 6. Capture the container
       const canvas = await html2canvas(container, {
         scale: 2,
         backgroundColor: '#ffffff',
