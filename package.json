@@ -12,11 +12,15 @@
     "@emailjs/browser": "^4.4.1",
     "date-fns": "^4.1.0",
     "firebase": "^10.8.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/html2canvas": "^1.4.1",
+    "@types/jspdf": "^2.0.0",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react": "^4.2.1",
