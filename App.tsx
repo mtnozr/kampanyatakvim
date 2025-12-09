@@ -384,7 +384,7 @@ function App() {
 
       // 3. Add Header Details directly to HTML (Fixes Turkish char issues in PDF Text)
       const headerTitle = document.createElement('h2');
-      headerTitle.innerText = `Kampanya Takvimi - ${format(currentDate, 'MMMM yyyy', { locale: tr })}`;
+      headerTitle.innerText = `Kampanya Yönetimi Takvimi (CRM) - ${format(currentDate, 'MMMM yyyy', { locale: tr })}`;
       headerTitle.style.marginBottom = '10px';
       headerTitle.style.textAlign = 'left';
       headerTitle.style.fontSize = '24px';
@@ -604,8 +604,16 @@ function App() {
         <div className="mb-6 flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex flex-col">
-              <h1 className="text-xl font-bold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                {isDesigner ? 'Kampanya Takvimi' : `Takvim: ${currentDepartmentName || 'Misafir Görünümü'}`}
+              <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                {isDesigner ? (
+                  <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm">
+                    Kampanya Yönetimi Takvimi (CRM)
+                  </span>
+                ) : (
+                  <span className="text-gray-800 font-bold uppercase tracking-wide">
+                    {`Takvim: ${currentDepartmentName || 'Misafir Görünümü'}`}
+                  </span>
+                )}
                 {!isDesigner && (
                   <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-md font-normal lowercase">salt okunur</span>
                 )}
