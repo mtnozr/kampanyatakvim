@@ -13,7 +13,7 @@ import {
   startOfWeek
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, Network } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, Network, Database } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { CalendarEvent, UrgencyLevel, User, AppNotification, ToastMessage, ActivityLog, Department, IpAccessConfig } from './types';
 import { INITIAL_EVENTS, DAYS_OF_WEEK, INITIAL_USERS, URGENCY_CONFIGS, TURKISH_HOLIDAYS, INITIAL_DEPARTMENTS, IP_ACCESS_CONFIG } from './constants';
@@ -25,115 +25,55 @@ import { LogPopover } from './components/LogPopover';
 import { ToastContainer } from './components/Toast';
 import { EventDetailsModal } from './components/EventDetailsModal';
 
+// --- FIREBASE IMPORTS ---
+import { db } from './firebase';
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  orderBy,
+  Timestamp,
+  setDoc
+} from 'firebase/firestore';
+
 // --- EMAILJS CONFIGURATION ---
 const EMAILJS_SERVICE_ID = 'service_q4mufkj';
 const EMAILJS_TEMPLATE_ID = 'template_mtdrews';
 const EMAILJS_PUBLIC_KEY = 'RBWpN3vQtjsZQGEKl';
 
-// --- LOCAL STORAGE KEYS ---
-const STORAGE_KEYS = {
-  EVENTS: 'app_events',
-  USERS: 'app_users',
-  DEPARTMENTS: 'app_departments',
-  IP_CONFIG: 'app_ip_config',
-  NOTIFICATIONS: 'app_notifications',
-  LOGS: 'app_logs'
-};
-
 function App() {
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // --- PERSISTENT STATE INITIALIZATION ---
+  // --- STATE MANAGEMENT (Pure Firestore) ---
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
-  // 1. Events State with LocalStorage
-  const [events, setEvents] = useState<CalendarEvent[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.EVENTS);
-      if (saved) {
-        return JSON.parse(saved, (key, value) => {
-          // Restore Date objects from strings
-          if (key === 'date') return new Date(value);
-          return value;
-        });
-      }
-    } catch (e) {
-      console.error("Failed to parse events from storage", e);
-    }
-    return INITIAL_EVENTS;
+  // Loading States
+  const [isEventsLoading, setIsEventsLoading] = useState(true);
+  const [isUsersLoading, setIsUsersLoading] = useState(true);
+
+  // IP Config is stored as a single document in 'settings' collection
+  const [ipConfig, setIpConfig] = useState<IpAccessConfig>({
+    designerIp: IP_ACCESS_CONFIG.DESIGNER_IP,
+    departmentIps: { ...IP_ACCESS_CONFIG.DEPARTMENT_IPS }
   });
 
-  // 2. Users State with LocalStorage
-  const [users, setUsers] = useState<User[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.USERS);
-      return saved ? JSON.parse(saved) : INITIAL_USERS;
-    } catch (e) {
-      return INITIAL_USERS;
-    }
-  });
+  // Logs and Notifications
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
 
-  // 3. Departments State with LocalStorage
-  const [departments, setDepartments] = useState<Department[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.DEPARTMENTS);
-      return saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
-    } catch (e) {
-      return INITIAL_DEPARTMENTS;
-    }
-  });
-
-  // 4. IP / Access Control State with LocalStorage
-  const [ipConfig, setIpConfig] = useState<IpAccessConfig>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.IP_CONFIG);
-      return saved ? JSON.parse(saved) : {
-        designerIp: IP_ACCESS_CONFIG.DESIGNER_IP,
-        departmentIps: { ...IP_ACCESS_CONFIG.DEPARTMENT_IPS }
-      };
-    } catch (e) {
-      return {
-        designerIp: IP_ACCESS_CONFIG.DESIGNER_IP,
-        departmentIps: { ...IP_ACCESS_CONFIG.DEPARTMENT_IPS }
-      };
-    }
-  });
-
-  // Defaulting to Designer IP for first load (Not persisted usually, but simulating session)
-  const [currentIp, setCurrentIp] = useState<string>(ipConfig.designerIp);
+  // Local UI State
+  const [currentIp, setCurrentIp] = useState<string>('');
   const [isIpSimOpen, setIsIpSimOpen] = useState(false);
-
-  // 5. Notification System State with LocalStorage
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-      if (saved) {
-        return JSON.parse(saved, (key, value) => {
-          if (key === 'date') return new Date(value);
-          return value;
-        });
-      }
-    } catch (e) { }
-    return [];
-  });
-
-  // 6. Logs State with LocalStorage
-  const [logs, setLogs] = useState<ActivityLog[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.LOGS);
-      if (saved) {
-        return JSON.parse(saved, (key, value) => {
-          if (key === 'timestamp') return new Date(value);
-          return value;
-        });
-      }
-    } catch (e) { }
-    return [];
-  });
-
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isFetchingIp, setIsFetchingIp] = useState(true);
 
   // Search & Filter State
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -147,33 +87,115 @@ function App() {
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<Date>(new Date());
   const [viewEvent, setViewEvent] = useState<CalendarEvent | null>(null);
 
-  // --- PERSISTENCE EFFECT HOOKS ---
-  // Whenever these states change, save them to localStorage
-
+  // --- IP DETECTION LOGIC ---
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
-  }, [events]);
+    const fetchPublicIp = async () => {
+      try {
+        setIsFetchingIp(true);
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        setCurrentIp(data.ip);
+        console.log("Detected Public IP:", data.ip);
+      } catch (error) {
+        console.error("Could not fetch IP:", error);
+        addToast('IP adresi algılanamadı.', 'info');
+      } finally {
+        setIsFetchingIp(false);
+      }
+    };
 
+    fetchPublicIp();
+  }, []);
+
+  // --- FIREBASE LISTENERS (REAL-TIME SYNC) ---
+
+  // 1. Sync Events
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-  }, [users]);
+    setIsEventsLoading(true);
+    const q = query(collection(db, "events"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedEvents: CalendarEvent[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title,
+          urgency: data.urgency,
+          assigneeId: data.assigneeId,
+          description: data.description,
+          departmentId: data.departmentId,
+          date: data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date)
+        } as CalendarEvent;
+      });
+      setEvents(fetchedEvents);
+      setIsEventsLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
+  // 2. Sync Users
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(departments));
-  }, [departments]);
+    setIsUsersLoading(true);
+    const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+      const fetchedUsers: User[] = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
+      setUsers(fetchedUsers);
+      setIsUsersLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
+  // 3. Sync Departments
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.IP_CONFIG, JSON.stringify(ipConfig));
-  }, [ipConfig]);
+    const unsubscribe = onSnapshot(collection(db, "departments"), (snapshot) => {
+      const fetchedDepts: Department[] = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Department));
+      setDepartments(fetchedDepts);
+    });
+    return () => unsubscribe();
+  }, []);
 
+  // 4. Sync Settings (IP Config)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
-  }, [notifications]);
+    const unsubscribe = onSnapshot(doc(db, "settings", "ipConfig"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as IpAccessConfig;
+        setIpConfig(data);
+      } else {
+        // Init default if missing
+        setDoc(doc(db, "settings", "ipConfig"), {
+          designerIp: IP_ACCESS_CONFIG.DESIGNER_IP,
+          departmentIps: IP_ACCESS_CONFIG.DEPARTMENT_IPS
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
+  // 5. Sync Notifications
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
-  }, [logs]);
+    const q = query(collection(db, "notifications"), orderBy("date", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedNotifs: AppNotification[] = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        date: doc.data().date instanceof Timestamp ? doc.data().date.toDate() : new Date()
+      } as AppNotification));
+      setNotifications(fetchedNotifs);
+    });
+    return () => unsubscribe();
+  }, []);
 
+  // 6. Sync Logs
+  useEffect(() => {
+    const q = query(collection(db, "logs"), orderBy("timestamp", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedLogs: ActivityLog[] = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        timestamp: doc.data().timestamp instanceof Timestamp ? doc.data().timestamp.toDate() : new Date()
+      } as ActivityLog));
+      setLogs(fetchedLogs);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // --- Derived Permissions based on IP ---
   const userRole = useMemo(() => {
@@ -214,7 +236,6 @@ function App() {
     return events.filter(event => {
       // 1. IP Access Control Filter
       if (userRole === 'department_user') {
-        // Only show events that belong to the user's department
         if (event.departmentId !== currentDepartmentId) {
           return false;
         }
@@ -222,7 +243,6 @@ function App() {
 
       // 2. Search & UI Filters
       const query = searchQuery.toLowerCase();
-      // Search in Title OR Event ID
       const matchesSearch =
         event.title.toLowerCase().includes(query) ||
         event.id.toLowerCase().includes(query);
@@ -268,44 +288,85 @@ function App() {
     setToasts((prev) => prev.filter(t => t.id !== id));
   };
 
-  // --- User Management ---
-  const handleAddUser = (name: string, email: string, emoji: string) => {
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      email,
-      emoji: emoji
-    };
-    setUsers([...users, newUser]);
-    addToast(`${name} başarıyla eklendi.`, 'success');
+  // --- FIREBASE ACTIONS ---
+
+  const seedDatabase = async () => {
+    try {
+      if (users.length === 0) {
+        for (const user of INITIAL_USERS) {
+          await setDoc(doc(db, "users", user.id), user);
+        }
+      }
+      if (departments.length === 0) {
+        for (const dept of INITIAL_DEPARTMENTS) {
+          await setDoc(doc(db, "departments", dept.id), dept);
+        }
+      }
+      if (events.length === 0) {
+        for (const event of INITIAL_EVENTS) {
+          const { id, ...eventData } = event;
+          await setDoc(doc(db, "events", id), {
+            ...eventData,
+            date: Timestamp.fromDate(event.date)
+          });
+        }
+      }
+      addToast('Veritabanı varsayılan verilerle dolduruldu.', 'success');
+    } catch (error) {
+      console.error("Seeding error:", error);
+      addToast('Veri yükleme hatası!', 'info');
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
-    setUsers(users.filter(u => u.id !== id));
+  const handleAddUser = async (name: string, email: string, emoji: string) => {
+    try {
+      await addDoc(collection(db, "users"), {
+        name,
+        email,
+        emoji
+      });
+      addToast(`${name} başarıyla eklendi.`, 'success');
+    } catch (e) {
+      addToast('Hata oluştu.', 'info');
+    }
   };
 
-  // --- Department Management ---
-  const handleAddDepartment = (name: string) => {
-    const newDept: Department = {
-      id: Math.random().toString(36).substr(2, 9),
-      name
-    };
-    setDepartments([...departments, newDept]);
-    addToast(`${name} birimi eklendi.`, 'success');
+  const handleDeleteUser = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "users", id));
+      addToast('Personel silindi.', 'info');
+    } catch (e) {
+      addToast('Silme hatası.', 'info');
+    }
   };
 
-  const handleDeleteDepartment = (id: string) => {
-    setDepartments(departments.filter(d => d.id !== id));
-    addToast('Birim silindi.', 'info');
+  const handleAddDepartment = async (name: string) => {
+    try {
+      await addDoc(collection(db, "departments"), { name });
+      addToast(`${name} birimi eklendi.`, 'success');
+    } catch (e) {
+      addToast('Hata oluştu.', 'info');
+    }
   };
 
-  // --- IP Config Management ---
-  const handleUpdateIpConfig = (newConfig: IpAccessConfig) => {
-    setIpConfig(newConfig);
-    addToast('Erişim ayarları güncellendi.', 'success');
+  const handleDeleteDepartment = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "departments", id));
+      addToast('Birim silindi.', 'info');
+    } catch (e) {
+      addToast('Silme hatası.', 'info');
+    }
   };
 
-  // --- Event Handling ---
+  const handleUpdateIpConfig = async (newConfig: IpAccessConfig) => {
+    try {
+      await setDoc(doc(db, "settings", "ipConfig"), newConfig);
+      addToast('Erişim ayarları güncellendi.', 'success');
+    } catch (e) {
+      addToast('Ayarlar kaydedilemedi.', 'info');
+    }
+  };
+
   const handleAddEvent = async (
     title: string,
     urgency: UrgencyLevel,
@@ -314,60 +375,56 @@ function App() {
     description?: string,
     departmentId?: string
   ) => {
-    // Generate a proper ID first to use in emails
-    const eventId = Math.random().toString(36).substr(2, 9).toUpperCase();
 
-    const newEvent: CalendarEvent = {
-      id: eventId,
+    const eventData = {
       title,
-      date,
+      date: Timestamp.fromDate(date),
       urgency,
       assigneeId,
       description,
       departmentId
     };
-    setEvents([...events, newEvent]);
+
+    let newEventId = "";
+
+    try {
+      const docRef = await addDoc(collection(db, "events"), eventData);
+      newEventId = docRef.id;
+      addToast('Kampanya oluşturuldu.', 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Hata: Kampanya kaydedilemedi.', 'info');
+      return;
+    }
 
     if (assigneeId) {
       const assignedUser = users.find(u => u.id === assigneeId);
       if (assignedUser) {
 
-        const newNotif: AppNotification = {
-          id: Math.random().toString(36).substr(2, 9),
+        await addDoc(collection(db, "notifications"), {
           title: 'Görev Ataması Yapıldı',
           message: `${assignedUser.name} kişisine "${title}" görevi atandı.`,
-          date: new Date(),
+          date: Timestamp.now(),
           isRead: false,
           type: 'email'
-        };
-        setNotifications((prev) => [newNotif, ...prev]);
+        });
 
-        const newLog: ActivityLog = {
-          id: Math.random().toString(36).substr(2, 9),
-          message: `${title} kampanyası için ${assignedUser.name} kişiye görev ataması yapıldı (ID: ${eventId})`,
-          timestamp: new Date()
-        };
-        setLogs((prev) => [newLog, ...prev]);
+        await addDoc(collection(db, "logs"), {
+          message: `${title} kampanyası için ${assignedUser.name} kişiye görev ataması yapıldı (ID: ${newEventId})`,
+          timestamp: Timestamp.now()
+        });
 
         setIsSendingEmail(true);
 
         let emailMessage = `${format(date, 'd MMMM yyyy', { locale: tr })} tarihindeki "${title}" kampanyası için görevlendirildiniz.\nAciliyet: ${URGENCY_CONFIGS[urgency].label}`;
+        if (description) emailMessage += `\n\nAçıklama:\n${description}`;
 
-        if (description) {
-          emailMessage += `\n\nAçıklama:\n${description}`;
-        }
-
-        // Find department name if exists
         if (departmentId) {
           const dept = departments.find(d => d.id === departmentId);
-          if (dept) {
-            emailMessage += `\n\nTalep Eden Birim: ${dept.name}`;
-          }
+          if (dept) emailMessage += `\n\nTalep Eden Birim: ${dept.name}`;
         }
 
-        // Footer message for mailto fallback (Plain text)
-        const footerIdText = `Ref ID: #${eventId}`;
-
+        const footerIdText = `Ref ID: #${newEventId.substring(0, 6).toUpperCase()}`;
         const templateParams = {
           to_email: assignedUser.email,
           to_name: assignedUser.name,
@@ -375,64 +432,54 @@ function App() {
           email: assignedUser.email,
           title: title,
           message: emailMessage,
-          ref_id: `#${eventId}`, // Param for EmailJS template (Footer 7pt)
+          ref_id: footerIdText,
         };
 
-        console.log('📨 E-posta gönderimi başlatılıyor. Parametreler:', templateParams);
-
         try {
-          const response = await emailjs.send(
-            EMAILJS_SERVICE_ID,
-            EMAILJS_TEMPLATE_ID,
-            templateParams,
-            EMAILJS_PUBLIC_KEY
-          );
-          console.log('✅ E-posta Başarılı:', response);
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
           addToast(`✅ E-posta gönderildi!`, 'success');
         } catch (error: any) {
-          console.error('❌ E-posta Hatası (API):', error);
-          addToast('⚠️ Güvenlik duvarı tespit edildi. Mail istemcisi açılıyor...', 'info');
-
+          console.error('❌ E-posta Hatası:', error);
+          addToast('Mail istemcisi açılıyor...', 'info');
           setTimeout(() => {
-            const subject = encodeURIComponent(`ACİL: Görev Ataması: ${title} [#${eventId}]`);
-            // Mailto doesn't support HTML styles like 7pt font, so we separate it visually
-            const body = encodeURIComponent(
-              `Sayın ${assignedUser.name},\n\n${emailMessage}\n\nİyi çalışmalar.\n\n----------------\n${footerIdText}`
-            );
-            // Added importance=High and X-Priority=1 for High Priority email
-            window.location.href = `mailto:${assignedUser.email}?subject=${subject}&body=${body}&importance=High&X-Priority=1`;
+            const subject = encodeURIComponent(`ACİL: Görev Ataması: ${title}`);
+            const body = encodeURIComponent(`Sayın ${assignedUser.name},\n\n${emailMessage}\n\n----------------\n${footerIdText}`);
+            window.location.href = `mailto:${assignedUser.email}?subject=${subject}&body=${body}&importance=High`;
           }, 1000);
-
         } finally {
           setIsSendingEmail(false);
         }
-
       }
-    } else {
-      addToast('Kampanya oluşturuldu (Atama yok).', 'success');
     }
   };
 
-  const handleDeleteEvent = (id: string) => {
-    setEvents(events.filter(e => e.id !== id));
-    addToast('Kampanya silindi.', 'info');
+  const handleDeleteEvent = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "events", id));
+      addToast('Kampanya silindi.', 'info');
+    } catch (e) {
+      addToast('Silme hatası.', 'info');
+    }
   };
 
-  const handleDeleteAllEvents = () => {
-    setEvents([]);
-    addToast('Tüm kampanyalar silindi.', 'info');
+  const handleDeleteAllEvents = async () => {
+    try {
+      events.forEach(async (ev) => {
+        await deleteDoc(doc(db, "events", ev.id));
+      });
+      addToast('Tüm kampanyalar siliniyor...', 'info');
+    } catch (e) {
+      addToast('Toplu silme hatası.', 'info');
+    }
   };
 
   const openAddModal = (date?: Date) => {
-    // Only Designers can add events
     if (!isDesigner) return;
-
     setSelectedDateForAdd(date || new Date());
     setIsModalOpen(true);
   };
 
   const getEventsForDay = (date: Date) => {
-    // Use filteredEvents here instead of raw events
     return filteredEvents.filter(event => isSameDay(event.date, date));
   };
 
@@ -444,21 +491,44 @@ function App() {
 
   const hasActiveFilters = searchQuery || filterAssignee || filterUrgency;
 
+  // Render Loading State if Initial Data Fetching
+  if (isEventsLoading || isUsersLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FE] flex-col gap-4">
+        <Loader2 size={40} className="text-violet-600 animate-spin" />
+        <p className="text-gray-500 font-medium animate-pulse">Veritabanına bağlanılıyor...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-4 md:p-8 text-gray-800">
       <div className="max-w-[1400px] mx-auto flex flex-col h-[calc(100vh-4rem)]">
 
         {/* Header Section */}
         <div className="mb-6 flex flex-col gap-4">
-          {/* Top Bar */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex flex-col">
               <h1 className="text-xl font-bold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                {isDesigner ? 'Kampanya Takvimi' : `Takvim: ${currentDepartmentName || 'Birim Görünümü'}`}
+                {isDesigner ? 'Kampanya Takvimi' : `Takvim: ${currentDepartmentName || 'Misafir Görünümü'}`}
                 {!isDesigner && (
                   <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-md font-normal lowercase">salt okunur</span>
                 )}
+                {isDesigner && users.length === 0 && events.length === 0 && (
+                  <button
+                    onClick={seedDatabase}
+                    className="ml-4 text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-green-200"
+                    title="Veritabanı boş görünüyor. Örnek verileri yüklemek için tıkla."
+                  >
+                    <Database size={12} /> Verileri Yükle
+                  </button>
+                )}
               </h1>
+              {isFetchingIp && (
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+                  <Loader2 size={10} className="animate-spin" /> IP Algılanıyor...
+                </div>
+              )}
               {isSendingEmail && (
                 <div className="flex items-center gap-2 mt-2 text-violet-600 text-xs font-bold animate-pulse">
                   <Loader2 size={12} className="animate-spin" />
@@ -486,7 +556,6 @@ function App() {
 
               <div className="h-6 w-px bg-gray-300 mx-2 hidden md:block"></div>
 
-              {/* Search Toggle - Available to everyone */}
               <button
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className={`p-2 transition-colors rounded-lg shadow-sm border ${isSearchOpen || hasActiveFilters ? 'text-violet-600 bg-violet-50 border-violet-100' : 'bg-white border-gray-100 text-gray-500 hover:text-violet-600'}`}
@@ -498,7 +567,6 @@ function App() {
                 )}
               </button>
 
-              {/* Admin & Notifications - Only for Designers */}
               {isDesigner && (
                 <>
                   <button
@@ -528,7 +596,9 @@ function App() {
                       isOpen={isLogOpen}
                       logs={logs}
                       onClose={() => setIsLogOpen(false)}
-                      onClear={() => setLogs([])}
+                      onClear={() => {
+                        logs.forEach(l => deleteDoc(doc(db, "logs", l.id)));
+                      }}
                     />
                   </div>
 
@@ -555,7 +625,9 @@ function App() {
                       isOpen={isNotifOpen}
                       notifications={notifications}
                       onClose={() => setIsNotifOpen(false)}
-                      onMarkAllRead={() => setNotifications([])}
+                      onMarkAllRead={() => {
+                        notifications.forEach(n => deleteDoc(doc(db, "notifications", n.id)));
+                      }}
                     />
                   </div>
 
@@ -666,7 +738,6 @@ function App() {
                   ${!isDesigner ? 'cursor-default' : 'cursor-pointer'}
                 `}
               >
-                {/* Date Number & Holiday Label */}
                 <div className="flex justify-between items-start mb-2">
                   {isHoliday && isCurrentMonth ? (
                     <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded leading-tight max-w-[65%] line-clamp-2">
@@ -685,7 +756,6 @@ function App() {
                   </span>
                 </div>
 
-                {/* Events List */}
                 <div className="flex-1 overflow-y-auto event-scroll">
                   {dayEvents.map(event => (
                     <EventBadge
@@ -697,7 +767,6 @@ function App() {
                   ))}
                 </div>
 
-                {/* Hover Add Indicator (Only for Designers) */}
                 {isDesigner && (
                   <>
                     <div className="absolute inset-0 bg-violet-50/0 group-hover:bg-violet-50/30 rounded-2xl pointer-events-none transition-colors" />
@@ -718,10 +787,17 @@ function App() {
       <div className="fixed bottom-4 left-4 z-40">
         <button
           onClick={() => setIsIpSimOpen(!isIpSimOpen)}
-          className="bg-gray-800 text-white p-3 rounded-full shadow-xl hover:bg-gray-700 transition-colors flex items-center gap-2 text-xs font-mono"
+          className={`
+                p-3 rounded-full shadow-xl transition-all flex items-center gap-2 text-xs font-mono
+                ${currentIp === ipConfig.designerIp
+              ? 'bg-violet-800 text-white hover:bg-violet-900'
+              : 'bg-gray-800 text-white hover:bg-gray-700'}
+            `}
         >
           <Network size={16} />
-          <span className="hidden md:inline">IP: {currentIp}</span>
+          <span className="hidden md:inline">
+            {currentIp ? `IP: ${currentIp}` : 'IP Yok (Misafir)'}
+          </span>
         </button>
         {isIpSimOpen && (
           <div className="absolute bottom-14 left-0 w-64 bg-white rounded-lg shadow-xl border border-gray-200 p-4 animate-in slide-in-from-bottom-2 max-h-[300px] overflow-y-auto">
