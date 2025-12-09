@@ -1,0 +1,5 @@
+{
+  "name": "Kampanya Yönetim Takvimi",
+  "description": "A visual campaign management calendar allowing users to view and add events with platform-specific color coding.",
+  "requestFramePermissions": []
+}
