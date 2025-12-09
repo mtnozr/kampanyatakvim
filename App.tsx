@@ -68,7 +68,6 @@ function App() {
 
   // Local UI State
   const [currentIp, setCurrentIp] = useState<string>('');
-  const [isIpSimOpen, setIsIpSimOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -819,50 +818,20 @@ function App() {
         </div>
       </div>
 
-      {/* Network / IP Simulation Tool (Floating Bottom Right) */}
+      {/* IP Display (Bottom Left) */}
       <div className="fixed bottom-4 left-4 z-40">
-        <button
-          onClick={() => setIsIpSimOpen(!isIpSimOpen)}
-          className={`
-                p-3 rounded-full shadow-xl transition-all flex items-center gap-2 text-xs font-mono
+        <div className={`
+                px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-mono opacity-80 backdrop-blur-sm
                 ${currentIp === ipConfig.designerIp
-              ? 'bg-violet-800 text-white hover:bg-violet-900'
-              : 'bg-gray-800 text-white hover:bg-gray-700'}
+            ? 'bg-violet-900/90 text-white'
+            : 'bg-gray-800/90 text-white'}
             `}
         >
-          <Network size={16} />
-          <span className="hidden md:inline">
-            {currentIp ? `IP: ${currentIp}` : 'IP Yok (Misafir)'}
+          <Network size={12} />
+          <span>
+            {currentIp ? `IP: ${currentIp}` : 'IP Yok'}
           </span>
-        </button>
-        {isIpSimOpen && (
-          <div className="absolute bottom-14 left-0 w-64 bg-white rounded-lg shadow-xl border border-gray-200 p-4 animate-in slide-in-from-bottom-2 max-h-[300px] overflow-y-auto">
-            <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Ağ Simülasyonu</h4>
-            <div className="space-y-2">
-              <button
-                onClick={() => { setCurrentIp(ipConfig.designerIp); setIsIpSimOpen(false); }}
-                className={`w-full text-left px-3 py-2 rounded text-xs flex justify-between items-center ${currentIp === ipConfig.designerIp ? 'bg-violet-100 text-violet-700 font-bold' : 'hover:bg-gray-50'}`}
-              >
-                <span>Designer (Admin)</span>
-                <span className="opacity-50">{ipConfig.designerIp}</span>
-              </button>
-              <div className="h-px bg-gray-100 my-1"></div>
-              {Object.entries(ipConfig.departmentIps).map(([ip, deptId]) => {
-                const deptName = departments.find(d => d.id === deptId)?.name;
-                return (
-                  <button
-                    key={ip}
-                    onClick={() => { setCurrentIp(ip); setIsIpSimOpen(false); }}
-                    className={`w-full text-left px-3 py-2 rounded text-xs flex justify-between items-center ${currentIp === ip ? 'bg-blue-100 text-blue-700 font-bold' : 'hover:bg-gray-50'}`}
-                  >
-                    <span>{deptName || 'Bilinmeyen Birim'}</span>
-                    <span className="opacity-50">{ip}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       <AddEventModal
