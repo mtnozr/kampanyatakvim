@@ -29,7 +29,6 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-    "src",
     ".",
     "components"
   ]
