@@ -922,8 +922,9 @@ function App() {
         />
 
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-      </div >
-      );
+      </div>
+    </div>
+  );
 }
 
-      export default App;
+export default App;
