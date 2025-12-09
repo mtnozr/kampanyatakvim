@@ -13,8 +13,10 @@ import {
   startOfWeek
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, Network, Database } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, Network, Database, Download } from 'lucide-react';
 import emailjs from '@emailjs/browser';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { CalendarEvent, UrgencyLevel, User, AppNotification, ToastMessage, ActivityLog, Department, IpAccessConfig } from './types';
 import { INITIAL_EVENTS, DAYS_OF_WEEK, INITIAL_USERS, URGENCY_CONFIGS, TURKISH_HOLIDAYS, INITIAL_DEPARTMENTS, IP_ACCESS_CONFIG } from './constants';
 import { EventBadge } from './components/EventBadge';
@@ -356,6 +358,48 @@ function App() {
     }
   };
 
+  const handleExportPdf = async () => {
+    const calendarElement = document.getElementById('printable-calendar');
+    if (!calendarElement) {
+      addToast('Takvim alanı bulunamadı.', 'info');
+      return;
+    }
+
+    try {
+      addToast('PDF hazırlanıyor...', 'info');
+      const canvas = await html2canvas(calendarElement, {
+        scale: 2, // Higher quality
+        backgroundColor: '#F8F9FE', // Match page bg
+        useCORS: true // For avatars/images if needed
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('l', 'mm', 'a4'); // Landscape, mm, A4
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 10; // Top margin
+
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+
+      // Add Title / Context
+      pdf.setFontSize(10);
+      pdf.text(`Kampanya Takvimi - ${format(currentDate, 'MMMM yyyy', { locale: tr })}`, 10, 7);
+      pdf.text(`Oluşturulma Tarihi: ${format(new Date(), 'dd.MM.yyyy HH:mm')}`, pdfWidth - 60, 7);
+
+      pdf.save(`kampanya-takvimi-${format(currentDate, 'yyyy-MM')}.pdf`);
+      addToast('PDF indirildi.', 'success');
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+      addToast('PDF oluşturulurken hata oluştu.', 'info');
+    }
+  };
+
   const handleUpdateIpConfig = async (newConfig: IpAccessConfig) => {
     try {
       await setDoc(doc(db, "settings", "ipConfig"), newConfig);
@@ -566,6 +610,14 @@ function App() {
               </button>
 
               <button
+                onClick={handleExportPdf}
+                className="p-2 text-gray-500 hover:text-pink-600 hover:bg-pink-50 transition-colors bg-white border border-gray-100 rounded-lg shadow-sm"
+                title="PDF Olarak İndir"
+              >
+                <Download size={20} />
+              </button>
+
+              <button
                 onClick={() => setIsAdminOpen(true)}
                 className="p-2 text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-colors bg-white border border-gray-100 rounded-lg shadow-sm"
                 title="Yönetici Paneli"
@@ -701,174 +753,177 @@ function App() {
           )}
         </div>
 
-        {/* Calendar Grid Header */}
-        <div className="grid grid-cols-7 gap-4 mb-4">
-          {DAYS_OF_WEEK.map(day => (
-            <div key={day} className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-              {day}
-            </div>
-          ))}
-        </div>
+        {/* Printable Area Wrapper */}
+        <div id="printable-calendar" className="p-1">
 
-        {/* Calendar Grid Body */}
-        <div className="grid grid-cols-7 gap-4 flex-1 auto-rows-fr">
-          {calendarDays.map((day) => {
-            const isCurrentMonth = isSameMonth(day, currentDate);
-            const isTodayDate = isToday(day);
-            const isDayWeekend = isWeekend(day);
-            const dayEvents = getEventsForDay(day);
-            const holidayName = getHolidayName(day);
-            const isHoliday = !!holidayName;
+          {/* Calendar Grid Header */}
+          <div className="grid grid-cols-7 gap-4 mb-4">
+            {DAYS_OF_WEEK.map(day => (
+              <div key={day} className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                {day}
+              </div>
+            ))}
+          </div>
 
-            return (
-              <div
-                key={day.toString()}
-                onClick={() => openAddModal(day)}
-                className={`
+          {/* Calendar Grid Body */}
+          <div className="grid grid-cols-7 gap-4 flex-1 auto-rows-fr">
+            {calendarDays.map((day) => {
+              const isCurrentMonth = isSameMonth(day, currentDate);
+              const isTodayDate = isToday(day);
+              const isDayWeekend = isWeekend(day);
+              const dayEvents = getEventsForDay(day);
+              const holidayName = getHolidayName(day);
+              const isHoliday = !!holidayName;
+
+              return (
+                <div
+                  key={day.toString()}
+                  onClick={() => openAddModal(day)}
+                  className={`
                   relative min-h-[120px] p-2 rounded-2xl border transition-all duration-200 group
                   flex flex-col
                   ${isCurrentMonth
-                    ? (isHoliday
-                      ? 'bg-red-50/70 border-red-200 shadow-sm'
-                      : isDayWeekend
-                        ? 'bg-gray-100 border-gray-200 shadow-sm'
-                        : 'bg-white border-transparent shadow-sm hover:shadow-md')
-                    : 'bg-gray-50/50 border-transparent opacity-60'}
+                      ? (isHoliday
+                        ? 'bg-red-50/70 border-red-200 shadow-sm'
+                        : isDayWeekend
+                          ? 'bg-gray-100 border-gray-200 shadow-sm'
+                          : 'bg-white border-transparent shadow-sm hover:shadow-md')
+                      : 'bg-gray-50/50 border-transparent opacity-60'}
                   ${isTodayDate ? 'ring-2 ring-violet-400 ring-offset-2' : ''}
                   ${!isDesigner ? 'cursor-default' : 'cursor-pointer'}
                 `}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  {isHoliday && isCurrentMonth ? (
-                    <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded leading-tight max-w-[65%] line-clamp-2">
-                      {holidayName}
-                    </span>
-                  ) : <div></div>}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    {isHoliday && isCurrentMonth ? (
+                      <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded leading-tight max-w-[65%] line-clamp-2">
+                        {holidayName}
+                      </span>
+                    ) : <div></div>}
 
-                  <span className={`
+                    <span className={`
                     text-sm font-bold w-8 h-8 flex items-center justify-center rounded-full
                     ${isTodayDate
-                      ? 'bg-violet-600 text-white'
-                      : isHoliday && isCurrentMonth ? 'text-red-600'
-                        : isCurrentMonth ? 'text-gray-700' : 'text-gray-400'}
+                        ? 'bg-violet-600 text-white'
+                        : isHoliday && isCurrentMonth ? 'text-red-600'
+                          : isCurrentMonth ? 'text-gray-700' : 'text-gray-400'}
                   `}>
-                    {format(day, 'd')}
-                  </span>
-                </div>
+                      {format(day, 'd')}
+                    </span>
+                  </div>
 
-                <div className="flex-1 overflow-y-auto event-scroll">
-                  {dayEvents.map(event => {
-                    // Visibility Logic
-                    const isMyDeptInfo = currentDepartmentId && event.departmentId === currentDepartmentId;
+                  <div className="flex-1 overflow-y-auto event-scroll">
+                    {dayEvents.map(event => {
+                      // Visibility Logic
+                      const isMyDeptInfo = currentDepartmentId && event.departmentId === currentDepartmentId;
 
-                    // Designer: Everything clear, everything clickable
-                    // Department User: 
-                    //    - Own Dept: Clear, NOT clickable (read-only)
-                    //    - Other Dept: Blurred, NOT clickable
-                    // Guest: Blurred, NOT clickable
+                      // Designer: Everything clear, everything clickable
+                      // Department User: 
+                      //    - Own Dept: Clear, NOT clickable (read-only)
+                      //    - Other Dept: Blurred, NOT clickable
+                      // Guest: Blurred, NOT clickable
 
-                    let isBlurred = false;
-                    let isClickable = false;
+                      let isBlurred = false;
+                      let isClickable = false;
 
-                    if (isDesigner) {
-                      isBlurred = false;
-                      isClickable = true;
-                    } else if (userRole === 'department_user') {
-                      if (isMyDeptInfo) {
-                        // My department: Clear but Read-Only
+                      if (isDesigner) {
                         isBlurred = false;
-                        isClickable = false;
+                        isClickable = true;
+                      } else if (userRole === 'department_user') {
+                        if (isMyDeptInfo) {
+                          // My department: Clear but Read-Only
+                          isBlurred = false;
+                          isClickable = false;
+                        } else {
+                          // Other department: Blurred and Read-Only
+                          isBlurred = true;
+                          isClickable = false;
+                        }
                       } else {
-                        // Other department: Blurred and Read-Only
+                        // Guest
                         isBlurred = true;
                         isClickable = false;
                       }
-                    } else {
-                      // Guest
-                      isBlurred = true;
-                      isClickable = false;
-                    }
 
-                    return (
-                      <EventBadge
-                        key={event.id}
-                        event={event}
-                        user={users.find(u => u.id === event.assigneeId)}
-                        onClick={setViewEvent}
-                        isBlurred={isBlurred}
-                        isClickable={isClickable}
-                      />
-                    );
-                  })}
-                </div>
+                      return (
+                        <EventBadge
+                          key={event.id}
+                          event={event}
+                          user={users.find(u => u.id === event.assigneeId)}
+                          onClick={setViewEvent}
+                          isBlurred={isBlurred}
+                          isClickable={isClickable}
+                        />
+                      );
+                    })}
+                  </div>
 
-                {isDesigner && (
-                  <>
-                    <div className="absolute inset-0 bg-violet-50/0 group-hover:bg-violet-50/30 rounded-2xl pointer-events-none transition-colors" />
-                    <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-white p-1 rounded-full shadow-sm text-violet-500">
-                        <Plus size={14} />
+                  {isDesigner && (
+                    <>
+                      <div className="absolute inset-0 bg-violet-50/0 group-hover:bg-violet-50/30 rounded-2xl pointer-events-none transition-colors" />
+                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-white p-1 rounded-full shadow-sm text-violet-500">
+                          <Plus size={14} />
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div> {/* End of printable-calendar */}
 
-      {/* IP Display (Bottom Left) */}
-      <div className="fixed bottom-4 left-4 z-40">
-        <div className={`
+        {/* IP Display (Bottom Left) */}
+        <div className="fixed bottom-4 left-4 z-40">
+          <div className={`
                 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-mono opacity-80 backdrop-blur-sm
                 ${currentIp === ipConfig.designerIp
-            ? 'bg-violet-900/90 text-white'
-            : 'bg-gray-800/90 text-white'}
+              ? 'bg-violet-900/90 text-white'
+              : 'bg-gray-800/90 text-white'}
             `}
-        >
-          <Network size={12} />
-          <span>
-            {currentIp ? `IP: ${currentIp}` : 'IP Yok'}
-          </span>
+          >
+            <Network size={12} />
+            <span>
+              {currentIp ? `IP: ${currentIp}` : 'IP Yok'}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <AddEventModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAdd={handleAddEvent}
-        initialDate={selectedDateForAdd}
-        users={users}
-        departments={departments}
-      />
+        <AddEventModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onAdd={handleAddEvent}
+          initialDate={selectedDateForAdd}
+          users={users}
+          departments={departments}
+        />
 
-      <AdminModal
-        isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
-        users={users}
-        events={events}
-        departments={departments}
-        onAddUser={handleAddUser}
-        onDeleteUser={handleDeleteUser}
-        onDeleteEvent={handleDeleteEvent}
-        onDeleteAllEvents={handleDeleteAllEvents}
-        onAddDepartment={handleAddDepartment}
-        onDeleteDepartment={handleDeleteDepartment}
-        ipConfig={ipConfig}
-        onUpdateIpConfig={handleUpdateIpConfig}
-      />
+        <AdminModal
+          isOpen={isAdminOpen}
+          onClose={() => setIsAdminOpen(false)}
+          users={users}
+          events={events}
+          departments={departments}
+          onAddUser={handleAddUser}
+          onDeleteUser={handleDeleteUser}
+          onDeleteEvent={handleDeleteEvent}
+          onDeleteAllEvents={handleDeleteAllEvents}
+          onAddDepartment={handleAddDepartment}
+          onDeleteDepartment={handleDeleteDepartment}
+          ipConfig={ipConfig}
+          onUpdateIpConfig={handleUpdateIpConfig}
+        />
 
-      <EventDetailsModal
-        event={viewEvent}
-        onClose={() => setViewEvent(null)}
-        assignee={users.find(u => u.id === viewEvent?.assigneeId)}
-        departments={departments}
-      />
+        <EventDetailsModal
+          event={viewEvent}
+          onClose={() => setViewEvent(null)}
+          assignee={users.find(u => u.id === viewEvent?.assigneeId)}
+          departments={departments}
+        />
 
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
-    </div >
-  );
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+      </div >
+      );
 }
 
-export default App;
+      export default App;
