@@ -169,13 +169,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return;
     }
 
-    // Check if IP already exists
-    if (ipConfig.departmentIps[newMapIp]) {
-      setError('Bu IP adresi zaten tanımlı.');
+    // Split by comma or whitespace to support multiple IPs
+    const ipsToAdd = newMapIp.split(/[,\s]+/).filter(ip => ip.trim() !== '');
+
+    // Check for existing IPs
+    const existingIps = ipsToAdd.filter(ip => ipConfig.departmentIps[ip]);
+
+    if (existingIps.length > 0) {
+      setError(`Şu IP'ler zaten tanımlı: ${existingIps.join(', ')}`);
       return;
     }
 
-    const updatedMap = { ...ipConfig.departmentIps, [newMapIp]: newMapDeptId };
+    const updatedMap = { ...ipConfig.departmentIps };
+    ipsToAdd.forEach(ip => {
+      updatedMap[ip] = newMapDeptId;
+    });
+
     onUpdateIpConfig({ ...ipConfig, departmentIps: updatedMap });
 
     setNewMapIp('');
