@@ -1,6 +1,6 @@
-import React from 'react';
-import { X, Calendar, User as UserIcon, AlertCircle, AlignLeft, Building } from 'lucide-react';
-import { CalendarEvent, User, Department } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, User as UserIcon, AlertCircle, AlignLeft, Building, Edit2, Save, XCircle } from 'lucide-react';
+import { CalendarEvent, User, Department, UrgencyLevel } from '../types';
 import { URGENCY_CONFIGS } from '../constants';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -9,14 +9,70 @@ interface EventDetailsModalProps {
   event: CalendarEvent | null;
   assignee?: User;
   departments: Department[];
+  users: User[];
+  isDesigner: boolean;
   onClose: () => void;
+  onEdit?: (eventId: string, updates: Partial<CalendarEvent>) => void;
 }
 
-export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, assignee, departments, onClose }) => {
+export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
+  event,
+  assignee,
+  departments,
+  users,
+  isDesigner,
+  onClose,
+  onEdit
+}) => {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editUrgency, setEditUrgency] = useState<UrgencyLevel>('Medium');
+  const [editDescription, setEditDescription] = useState('');
+  const [editAssigneeId, setEditAssigneeId] = useState('');
+  const [editDepartmentId, setEditDepartmentId] = useState('');
+
+  useEffect(() => {
+    if (event) {
+      setEditTitle(event.title);
+      setEditDate(format(event.date, 'yyyy-MM-dd'));
+      setEditUrgency(event.urgency);
+      setEditDescription(event.description || '');
+      setEditAssigneeId(event.assigneeId || '');
+      setEditDepartmentId(event.departmentId || '');
+    }
+  }, [event]);
+
   if (!event) return null;
 
   const config = URGENCY_CONFIGS[event.urgency];
   const department = departments.find(d => d.id === event.departmentId);
+
+  const handleSave = () => {
+    if (!onEdit || !editTitle.trim()) return;
+
+    onEdit(event.id, {
+      title: editTitle,
+      date: new Date(editDate),
+      urgency: editUrgency,
+      description: editDescription,
+      assigneeId: editAssigneeId || undefined,
+      departmentId: editDepartmentId || undefined
+    });
+
+    setIsEditMode(false);
+  };
+
+  const handleCancel = () => {
+    // Reset to original values
+    setEditTitle(event.title);
+    setEditDate(format(event.date, 'yyyy-MM-dd'));
+    setEditUrgency(event.urgency);
+    setEditDescription(event.description || '');
+    setEditAssigneeId(event.assigneeId || '');
+    setEditDepartmentId(event.departmentId || '');
+    setIsEditMode(false);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -24,15 +80,25 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ass
 
         {/* Header with Urgency Color */}
         <div className={`px-6 py-4 border-b flex justify-between items-start ${config.colorBg} bg-opacity-30 shrink-0`}>
-          <div>
+          <div className="flex-1">
             <span className={`inline-block px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${config.colorBorder} ${config.colorText} bg-white/50 mb-2`}>
               {config.label}
             </span>
-            <h2 className="text-xl font-bold text-gray-800 leading-tight">{event.title}</h2>
+            {isEditMode ? (
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="text-xl font-bold text-gray-800 leading-tight w-full border-b-2 border-violet-300 focus:border-violet-600 outline-none bg-transparent"
+                placeholder="Kampanya Başlığı"
+              />
+            ) : (
+              <h2 className="text-xl font-bold text-gray-800 leading-tight">{event.title}</h2>
+            )}
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 bg-white/50 hover:bg-white rounded-full p-1 transition-colors"
+            className="text-gray-500 hover:text-gray-800 bg-white/50 hover:bg-white rounded-full p-1 transition-colors ml-2"
           >
             <X size={20} />
           </button>
@@ -45,11 +111,20 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ass
             <div className="p-2 bg-violet-50 text-violet-600 rounded-lg shrink-0">
               <Calendar size={20} />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tarih</p>
-              <p className="text-gray-800 font-medium">
-                {format(event.date, 'd MMMM yyyy, EEEE', { locale: tr })}
-              </p>
+              {isEditMode ? (
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm"
+                />
+              ) : (
+                <p className="text-gray-800 font-medium">
+                  {format(event.date, 'd MMMM yyyy, EEEE', { locale: tr })}
+                </p>
+              )}
             </div>
           </div>
 
@@ -58,11 +133,24 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ass
             <div className="p-2 bg-teal-50 text-teal-600 rounded-lg shrink-0">
               <Building size={20} />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Talep Eden Birim</p>
-              <p className="text-gray-800 font-medium">
-                {department ? department.name : 'Belirtilmemiş'}
-              </p>
+              {isEditMode ? (
+                <select
+                  value={editDepartmentId}
+                  onChange={(e) => setEditDepartmentId(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm bg-white"
+                >
+                  <option value="">Seçiniz</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-gray-800 font-medium">
+                  {department ? department.name : 'Belirtilmemiş'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -71,67 +159,142 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ass
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0">
               <UserIcon size={20} />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Görevli Personel</p>
-              {assignee ? (
-                <div className="flex items-center gap-2 mt-1">
-                  {assignee.emoji ? (
-                    <span className="text-xl bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center border border-gray-200">
-                      {assignee.emoji}
-                    </span>
-                  ) : (
-                    <div className="w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                      {assignee.name.charAt(0)}
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{assignee.name}</p>
-                    <p className="text-xs text-gray-500">{assignee.email}</p>
-                  </div>
-                </div>
+              {isEditMode ? (
+                <select
+                  value={editAssigneeId}
+                  onChange={(e) => setEditAssigneeId(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm bg-white"
+                >
+                  <option value="">Atama Yok</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.emoji} {user.name}
+                    </option>
+                  ))}
+                </select>
               ) : (
-                <p className="text-sm text-gray-500 italic mt-1">Atama yapılmadı.</p>
+                assignee ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    {assignee.emoji ? (
+                      <span className="text-xl bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center border border-gray-200">
+                        {assignee.emoji}
+                      </span>
+                    ) : (
+                      <div className="w-8 h-8 bg-violet-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                        {assignee.name.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{assignee.name}</p>
+                      <p className="text-xs text-gray-500">{assignee.email}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic mt-1">Atama yapılmadı.</p>
+                )
               )}
             </div>
           </div>
 
-          {/* Urgency Description Section */}
+          {/* Urgency Section */}
           <div className="flex items-start gap-3">
             <div className="p-2 bg-gray-50 text-gray-600 rounded-lg shrink-0">
               <AlertCircle size={20} />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Aciliyet Seviyesi</p>
-              <p className="text-sm text-gray-700 mt-1">
-                Bu kampanya <strong>{config.label}</strong> öncelik seviyesindedir.
-              </p>
+              {isEditMode ? (
+                <select
+                  value={editUrgency}
+                  onChange={(e) => setEditUrgency(e.target.value as UrgencyLevel)}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm bg-white"
+                >
+                  <option value="Low">Düşük (Low)</option>
+                  <option value="Medium">Orta (Medium)</option>
+                  <option value="High">Yüksek (High)</option>
+                  <option value="Critical">Kritik (Critical)</option>
+                </select>
+              ) : (
+                <p className="text-sm text-gray-700 mt-1">
+                  Bu kampanya <strong>{config.label}</strong> öncelik seviyesindedir.
+                </p>
+              )}
             </div>
           </div>
 
           {/* Description Section */}
-          {event.description && (
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg shrink-0">
-                <AlignLeft size={20} />
-              </div>
-              <div className="w-full">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Açıklama</p>
-                <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap leading-relaxed bg-gray-50 p-3 rounded-lg border border-gray-100">
-                  {event.description}
-                </p>
-              </div>
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg shrink-0">
+              <AlignLeft size={20} />
             </div>
-          )}
+            <div className="w-full">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Açıklama</p>
+              {isEditMode ? (
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={4}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm resize-none"
+                  placeholder="Kampanya açıklaması (isteğe bağlı)"
+                />
+              ) : (
+                event.description ? (
+                  <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap leading-relaxed bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    {event.description}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic mt-1">Açıklama eklenmemiş.</p>
+                )
+              )}
+            </div>
+          </div>
 
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 text-center shrink-0">
-          <button
-            onClick={onClose}
-            className="text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            Kapat
-          </button>
+        {/* Footer Actions */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 shrink-0">
+          {isDesigner && !isEditMode ? (
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsEditMode(true)}
+                className="flex-1 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+              >
+                <Edit2 size={16} /> Düzenle
+              </button>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-gray-500 hover:text-gray-800 font-medium text-sm transition-colors"
+              >
+                Kapat
+              </button>
+            </div>
+          ) : isEditMode ? (
+            <div className="flex gap-3">
+              <button
+                onClick={handleSave}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+              >
+                <Save size={16} /> Kaydet
+              </button>
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+              >
+                <XCircle size={16} /> İptal
+              </button>
+            </div>
+          ) : (
+            <div className="text-center">
+              <button
+                onClick={onClose}
+                className="text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+              >
+                Kapat
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

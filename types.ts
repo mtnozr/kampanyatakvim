@@ -4,7 +4,6 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  avatarUrl?: string; // Made optional as we might use emoji instead
   emoji?: string;     // New property for selected emoji
 }
 
@@ -51,7 +50,11 @@ export interface ToastMessage {
   type: 'success' | 'info';
 }
 
-export interface IpAccessConfig {
-  designerIps: string[];
-  departmentIps: Record<string, string>; // key: IP Address, value: Department ID
+export interface DepartmentUser {
+  id: string;
+  username: string;
+  password: string;
+  departmentId: string;
+  isDesigner?: boolean;
+  createdAt: Date;
 }

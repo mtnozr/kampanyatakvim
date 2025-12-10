@@ -49,18 +49,6 @@ export const INITIAL_DEPARTMENTS: Department[] = [
   { id: 'd5', name: 'Finans' },
 ];
 
-// --- IP ACCESS CONTROL CONFIGURATION ---
-export const IP_ACCESS_CONFIG = {
-  DESIGNER_IPS: ['88.243.155.218'], // Admin/Designer Access (Full)
-  DEPARTMENT_IPS: {
-    '192.168.1.20': 'd1', // Pazarlama
-    '192.168.1.21': 'd2', // İK
-    '192.168.1.22': 'd3', // IT
-    '192.168.1.23': 'd4', // Satış
-    '192.168.1.24': 'd5', // Finans
-  } as Record<string, string>
-};
-
 const today = new Date();
 const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 

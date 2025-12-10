@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Plus, ShieldCheck, Lock, Users, Calendar, AlertTriangle, Building, Network, LogOut, FileText, Download, Upload } from 'lucide-react';
-import { User, CalendarEvent, Department, IpAccessConfig } from '../types';
+import { X, Trash2, Plus, ShieldCheck, Lock, Users, Calendar, AlertTriangle, Building, UserPlus, LogOut, FileText, Download } from 'lucide-react';
+import { User, CalendarEvent, Department, DepartmentUser } from '../types';
 import { AVAILABLE_EMOJIS, URGENCY_CONFIGS } from '../constants';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { auth } from '../firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -15,15 +13,17 @@ interface AdminModalProps {
   users: User[];
   events: CalendarEvent[];
   departments: Department[];
-  onAddUser: (name: string, email: string, emoji: string, avatarUrl?: string) => void;
+  onAddUser: (name: string, email: string, emoji: string) => void;
   onDeleteUser: (id: string) => void;
   onDeleteEvent: (id: string) => void;
   onDeleteAllEvents: () => void;
   onAddDepartment: (name: string) => void;
   onDeleteDepartment: (id: string) => void;
-  ipConfig: IpAccessConfig;
-  onUpdateIpConfig: (config: IpAccessConfig) => void;
+  departmentUsers: DepartmentUser[];
+  onAddDepartmentUser: (username: string, password: string, departmentId: string, isDesigner: boolean) => void;
+  onDeleteDepartmentUser: (id: string) => void;
   onBulkAddEvents: (events: Partial<CalendarEvent>[]) => Promise<void>;
+  onSetIsDesigner: (value: boolean) => void;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -38,14 +38,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onDeleteAllEvents,
   onAddDepartment,
   onDeleteDepartment,
-  ipConfig,
-  onUpdateIpConfig,
-  onBulkAddEvents
+  departmentUsers,
+  onAddDepartmentUser,
+  onDeleteDepartmentUser,
+  onBulkAddEvents,
+  onSetIsDesigner
 }) => {
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'departments' | 'access' | 'import-export'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'departments' | 'dept-users' | 'import-export'>('users');
   const [importText, setImportText] = useState('');
 
   // Loading state for auth check
@@ -55,17 +57,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadPreview, setUploadPreview] = useState<string>('');
 
   // Department Form States
   const [newDeptName, setNewDeptName] = useState('');
 
-  // Access / IP Form States
-  const [newDesignerIp, setNewDesignerIp] = useState('');
-  const [newMapIp, setNewMapIp] = useState('');
-  const [newMapDeptId, setNewMapDeptId] = useState('');
+  // Department User Form States
+  const [newDeptUsername, setNewDeptUsername] = useState('');
+  const [newDeptPassword, setNewDeptPassword] = useState('');
+  const [newDeptUserDeptId, setNewDeptUserDeptId] = useState('');
+  const [newDeptUserIsDesigner, setNewDeptUserIsDesigner] = useState(false);
 
   const [error, setError] = useState('');
 
@@ -76,9 +76,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
       setIsAuthLoading(false);
+      onSetIsDesigner(!!user);
     });
     return () => unsubscribe();
-  }, []);
+  }, [onSetIsDesigner]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,22 +108,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setAvatarFile(file);
 
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-
-      // Clear emoji selection
-      setSelectedEmoji('');
-    }
-  };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,43 +118,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return;
     }
 
-    if (!selectedEmoji && !avatarFile) {
-      setError('Lütfen bir emoji seçiniz veya fotoğraf yükleyiniz.');
+    if (!selectedEmoji) {
+      setError('Lütfen bir emoji seçiniz.');
       return;
     }
 
-    setIsUploading(true);
-
     try {
-      let avatarUrl = '';
-
-      if (avatarFile) {
-        // Upload file
-        const timestamp = Date.now();
-        const fileRef = ref(storage, `user-avatars/${timestamp}_${avatarFile.name}`);
-        const snapshot = await uploadBytes(fileRef, avatarFile);
-        avatarUrl = await getDownloadURL(snapshot.ref);
-      }
-
-      // We pass generic emoji if avatar exists, or the selected emoji
-      // If avatarUrl exists, EventBadge prefers it over emoji.
-      // But we can pass a fallback emoji just in case.
-      const emojiToSave = selectedEmoji || '👤';
-
-      await onAddUser(newName, newEmail, emojiToSave, avatarUrl);
+      await onAddUser(newName, newEmail, selectedEmoji);
 
       // Reset form
       setNewName('');
       setNewEmail('');
       setSelectedEmoji('');
-      setAvatarFile(null);
-      setUploadPreview('');
       setError('');
     } catch (err: any) {
       console.error(err);
       setError('Kullanıcı eklenirken hata oluştu: ' + err.message);
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -183,70 +148,29 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setError('');
   };
 
-  // --- Access Management Handlers ---
-  const handleAddDesignerIp = (e: React.FormEvent) => {
+  // --- Department User Management Handler ---
+  const handleAddDeptUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDesignerIp.trim()) {
-      setError('IP adresi boş olamaz.');
-      return;
-    }
-    const currentIps = ipConfig.designerIps || [];
-    if (currentIps.includes(newDesignerIp)) {
-      setError('Bu IP zaten ekli.');
+    if (!newDeptUsername.trim() || !newDeptPassword.trim() || !newDeptUserDeptId) {
+      setError('Tüm alanları doldurunuz.');
       return;
     }
 
-    onUpdateIpConfig({
-      ...ipConfig,
-      designerIps: [...currentIps, newDesignerIp]
-    });
-    setNewDesignerIp('');
+    // Check if username already exists
+    const existingUser = departmentUsers.find(
+      u => u.username.toLowerCase() === newDeptUsername.toLowerCase()
+    );
+    if (existingUser) {
+      setError('Bu kullanıcı adı zaten kullanılıyor.');
+      return;
+    }
+
+    onAddDepartmentUser(newDeptUsername, newDeptPassword, newDeptUserDeptId, newDeptUserIsDesigner);
+    setNewDeptUsername('');
+    setNewDeptPassword('');
+    setNewDeptUserDeptId('');
+    setNewDeptUserIsDesigner(false);
     setError('');
-  };
-
-  const handleRemoveDesignerIp = (ipToRemove: string) => {
-    const currentIps = ipConfig.designerIps || [];
-    const newIps = currentIps.filter(ip => ip !== ipToRemove);
-    onUpdateIpConfig({
-      ...ipConfig,
-      designerIps: newIps
-    });
-  };
-
-  const handleAddIpMapping = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMapIp.trim() || !newMapDeptId) {
-      setError('Lütfen IP adresi ve birim seçiniz.');
-      return;
-    }
-
-    // Split by comma or whitespace to support multiple IPs
-    const ipsToAdd = newMapIp.split(/[,\s]+/).filter(ip => ip.trim() !== '');
-
-    // Check for existing IPs
-    const existingIps = ipsToAdd.filter(ip => ipConfig.departmentIps[ip]);
-
-    if (existingIps.length > 0) {
-      setError(`Şu IP'ler zaten tanımlı: ${existingIps.join(', ')}`);
-      return;
-    }
-
-    const updatedMap = { ...ipConfig.departmentIps };
-    ipsToAdd.forEach(ip => {
-      updatedMap[ip] = newMapDeptId;
-    });
-
-    onUpdateIpConfig({ ...ipConfig, departmentIps: updatedMap });
-
-    setNewMapIp('');
-    setNewMapDeptId('');
-    setError('');
-  };
-
-  const handleDeleteIpMapping = (ip: string) => {
-    const updatedMap = { ...ipConfig.departmentIps };
-    delete updatedMap[ip];
-    onUpdateIpConfig({ ...ipConfig, departmentIps: updatedMap });
   };
 
   // --- Import / Export Handlers ---
@@ -441,10 +365,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 <Building size={16} /> Birimler
               </button>
               <button
-                onClick={() => setActiveTab('access')}
-                className={`flex-1 py-3 px-2 text-xs md:text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'access' ? 'border-violet-600 text-violet-600 bg-violet-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                onClick={() => setActiveTab('dept-users')}
+                className={`flex-1 py-3 px-2 text-xs md:text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'dept-users' ? 'border-violet-600 text-violet-600 bg-violet-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               >
-                <Network size={16} /> Erişim
+                <UserPlus size={16} /> Birim Kullanıcıları
               </button>
               <button
                 onClick={() => setActiveTab('import-export')}
@@ -494,55 +418,20 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-2 block">Avatar Seçimi (Emoji veya Fotoğraf)</label>
+                        <label className="text-xs font-semibold text-gray-500 mb-2 block">Emoji Seçimi</label>
 
-                        {/* File Upload Area */}
-                        <div className="mb-3">
-                          <label
-                            className={`
-                              flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors
-                              ${avatarFile ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-gray-200 hover:border-violet-400 text-gray-500'}
-                            `}
-                          >
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleFileSelect}
-                              className="hidden"
-                            />
-                            {uploadPreview ? (
-                              <div className="flex items-center gap-3">
-                                <img src={uploadPreview} alt="Preview" className="w-8 h-8 rounded-full object-cover shadow-sm bg-white" />
-                                <span className="text-sm font-medium">Fotoğraf Seçildi Değiştir</span>
-                              </div>
-                            ) : (
-                              <>
-                                <Upload size={18} />
-                                <span className="text-sm">Fotoğraf Seç (İsteğe Bağlı)</span>
-                              </>
-                            )}
-                          </label>
-                        </div>
-
-                        {/* Emoji Divider */}
-                        <div className="relative flex py-2 items-center">
-                          <div className="flex-grow border-t border-gray-100"></div>
-                          <span className="flex-shrink-0 mx-2 text-[10px] text-gray-400 font-medium uppercase">Veya Emoji Seç</span>
-                          <div className="flex-grow border-t border-gray-100"></div>
-                        </div>
-
-                        <div className={`grid grid-cols-8 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100 max-h-32 overflow-y-auto custom-scrollbar ${avatarFile ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className="grid grid-cols-8 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100 max-h-32 overflow-y-auto custom-scrollbar">
                           {AVAILABLE_EMOJIS.map((emoji) => (
                             <button
                               key={emoji}
                               type="button"
                               onClick={() => setSelectedEmoji(emoji)}
                               className={`
-                                          w-8 h-8 flex items-center justify-center rounded-full text-lg transition-all
-                                          ${selectedEmoji === emoji
+                                w-8 h-8 flex items-center justify-center rounded-full text-lg transition-all
+                                ${selectedEmoji === emoji
                                   ? 'bg-violet-600 ring-2 ring-violet-300 transform scale-110 shadow-md'
                                   : 'bg-white hover:bg-gray-200'}
-                                      `}
+                              `}
                             >
                               {emoji}
                             </button>
@@ -554,14 +443,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         <p className="text-red-500 text-xs h-4">{error}</p>
                         <button
                           type="submit"
-                          disabled={isUploading}
-                          className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 flex items-center gap-2 shadow-lg shadow-violet-200 text-sm disabled:opacity-70 disabled:cursor-wait"
+                          className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 flex items-center gap-2 shadow-lg shadow-violet-200 text-sm"
                         >
-                          {isUploading ? (
-                            <>Yükleniyor...</>
-                          ) : (
-                            <><Plus size={16} /> Ekle</>
-                          )}
+                          <Plus size={16} /> Ekle
                         </button>
                       </div>
                     </form>
@@ -574,13 +458,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       {users.map(user => (
                         <div key={user.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between group hover:shadow-sm transition-all">
                           <div className="flex items-center gap-3">
-                            {user.emoji ? (
-                              <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-xl shadow-sm">
-                                {user.emoji}
-                              </div>
-                            ) : (
-                              <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full bg-gray-200" />
-                            )}
+                            <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-xl shadow-sm">
+                              {user.emoji}
+                            </div>
                             <div>
                               <p className="font-semibold text-gray-800 text-sm">{user.name}</p>
                               <p className="text-xs text-gray-500">{user.email}</p>
@@ -656,81 +536,42 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
               )}
 
-              {/* --- ACCESS (IP) TAB --- */}
-              {activeTab === 'access' && (
+              {/* --- DEPARTMENT USERS TAB --- */}
+              {activeTab === 'dept-users' && (
                 <div className="flex flex-col h-full">
-                  {/* Designer IP Config */}
+                  {/* Add Department User Form */}
                   <div className="p-6 bg-white border-b space-y-4 shrink-0">
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                      <ShieldCheck size={14} /> Admin (Designer) Erişimi
+                      <UserPlus size={14} /> Yeni Birim Kullanıcısı Ekle
                     </h3>
 
-                    {/* Add Designer IP Form */}
-                    <form onSubmit={handleAddDesignerIp} className="flex gap-3 items-end">
-                      <div className="flex-1">
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">Yeni Admin IP Ekle</label>
-                        <input
-                          type="text"
-                          value={newDesignerIp}
-                          onChange={(e) => setNewDesignerIp(e.target.value)}
-                          placeholder="Örn: 88.243..."
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm font-mono"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm flex items-center gap-2"
-                      >
-                        <Plus size={16} /> Ekle
-                      </button>
-                    </form>
-
-                    {/* Designer IPs List */}
-                    <div className="space-y-2 mt-2">
-                      {(ipConfig.designerIps || []).map((ip) => (
-                        <div key={ip} className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center justify-between">
-                          <code className="text-sm text-slate-700 font-mono font-bold">{ip}</code>
-                          <button
-                            onClick={() => handleRemoveDesignerIp(ip)}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                            title="IP'yi Sil"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      ))}
-                      {(ipConfig.designerIps || []).length === 0 && (
-                        <p className="text-xs text-orange-500 bg-orange-50 p-2 rounded border border-orange-100 italic">
-                          ⚠️ Hiçbir yönetici IP adresi tanımlı değil.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Department IP Mappings */}
-                  <div className="p-6 flex-1 overflow-y-auto">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4 flex items-center gap-2">
-                      <Network size={14} /> Birim IP Eşleştirmeleri
-                    </h3>
-
-                    {/* Add Mapping Form */}
-                    <form onSubmit={handleAddIpMapping} className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                    <form onSubmit={handleAddDeptUser} className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <label className="text-[10px] font-bold text-gray-400 mb-1 block uppercase">IP Adresi</label>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">Kullanıcı Adı</label>
                           <input
                             type="text"
-                            value={newMapIp}
-                            onChange={(e) => setNewMapIp(e.target.value)}
-                            placeholder="192.168.1.X"
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm font-mono"
+                            value={newDeptUsername}
+                            onChange={(e) => setNewDeptUsername(e.target.value)}
+                            placeholder="ornek_kullanici"
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-gray-400 mb-1 block uppercase">Birim</label>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">Şifre</label>
+                          <input
+                            type="text"
+                            value={newDeptPassword}
+                            onChange={(e) => setNewDeptPassword(e.target.value)}
+                            placeholder="sifre123"
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">Birim</label>
                           <select
-                            value={newMapDeptId}
-                            onChange={(e) => setNewMapDeptId(e.target.value)}
+                            value={newDeptUserDeptId}
+                            onChange={(e) => setNewDeptUserDeptId(e.target.value)}
                             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm bg-white"
                           >
                             <option value="">Seçiniz</option>
@@ -740,36 +581,66 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           </select>
                         </div>
                       </div>
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newDeptUserIsDesigner}
+                            onChange={(e) => setNewDeptUserIsDesigner(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          <span className="text-sm text-gray-700">Designer Yetkisi Ver</span>
+                          <span className="text-[10px] text-gray-400">(Kampanya düzenleme izni)</span>
+                        </label>
+                      </div>
                       <div className="flex justify-between items-center">
                         <p className="text-red-500 text-xs h-4">{error}</p>
-                        <button type="submit" className="px-4 py-1.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-xs font-bold shadow-sm">
-                          Ekle
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm flex items-center gap-2"
+                        >
+                          <Plus size={16} /> Ekle
                         </button>
                       </div>
                     </form>
+                  </div>
 
-                    {/* Mappings List */}
+                  {/* Department Users List */}
+                  <div className="p-6 flex-1 overflow-y-auto">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">
+                      Mevcut Kullanıcılar ({departmentUsers.length})
+                    </h3>
                     <div className="space-y-2">
-                      {Object.entries(ipConfig.departmentIps).map(([ip, deptId]) => {
-                        const dept = departments.find(d => d.id === deptId);
+                      {departmentUsers.map(user => {
+                        const dept = departments.find(d => d.id === user.departmentId);
                         return (
-                          <div key={ip} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between group hover:shadow-sm transition-all">
-                            <div>
-                              <p className="font-mono text-sm text-gray-800 font-bold">{ip}</p>
-                              <p className="text-xs text-gray-500">{dept ? dept.name : 'Silinmiş Birim'}</p>
+                          <div key={user.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between group hover:shadow-sm transition-all">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${user.isDesigner ? 'bg-violet-100 text-violet-600' : 'bg-teal-100 text-teal-600'}`}>
+                                {user.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-gray-800 text-sm">{user.username}</p>
+                                  {user.isDesigner && (
+                                    <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-medium">Designer</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">{dept ? dept.name : 'Silinmiş Birim'}</p>
+                              </div>
                             </div>
                             <button
-                              onClick={() => handleDeleteIpMapping(ip)}
+                              onClick={() => onDeleteDepartmentUser(user.id)}
                               className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Eşleştirmeyi Sil"
+                              title="Kullanıcıyı Sil"
                             >
                               <Trash2 size={16} />
                             </button>
                           </div>
                         );
                       })}
-                      {Object.keys(ipConfig.departmentIps).length === 0 && (
-                        <p className="text-gray-400 text-center py-4 text-sm">Henüz IP tanımlaması yapılmamış.</p>
+                      {departmentUsers.length === 0 && (
+                        <p className="text-gray-400 text-center py-4 text-sm">Henüz birim kullanıcısı eklenmemiş.</p>
                       )}
                     </div>
                   </div>
@@ -878,7 +749,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                       <div className="flex items-start gap-4">
                         <div className="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
-                          <Upload size={24} />
+                          <FileText size={24} />
                         </div>
                         <div className="flex-1">
                           <h3 className="text-sm font-bold text-gray-800 mb-1">İçe Aktar (CSV Yükle)</h3>
@@ -898,7 +769,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                               onClick={handleImportCSV}
                               className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-start gap-2 ml-auto"
                             >
-                              <Upload size={16} /> İçe Aktar
+                              <FileText size={16} /> İçe Aktar
                             </button>
                           </div>
                         </div>

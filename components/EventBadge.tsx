@@ -37,17 +37,7 @@ export const EventBadge: React.FC<EventBadgeProps> = ({
       );
     }
 
-    if (user.avatarUrl) {
-      return (
-        <img
-          src={user.avatarUrl}
-          alt={user.name}
-          className="w-5 h-5 rounded-full border border-white shadow-sm object-cover bg-gray-200 shrink-0"
-        />
-      );
-    }
-
-    // Fallback if neither emoji nor url
+    // Fallback if no emoji
     return (
       <div className="w-5 h-5 rounded-full border border-white shadow-sm bg-violet-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
         {user.name.charAt(0)}

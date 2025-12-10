@@ -13,12 +13,12 @@ import {
   startOfWeek
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, Network, Database, Download } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, LogIn, LogOut, Database, Download } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { CalendarEvent, UrgencyLevel, User, AppNotification, ToastMessage, ActivityLog, Department, IpAccessConfig } from './types';
-import { INITIAL_EVENTS, DAYS_OF_WEEK, INITIAL_USERS, URGENCY_CONFIGS, TURKISH_HOLIDAYS, INITIAL_DEPARTMENTS, IP_ACCESS_CONFIG } from './constants';
+import { CalendarEvent, UrgencyLevel, User, AppNotification, ToastMessage, ActivityLog, Department, DepartmentUser } from './types';
+import { INITIAL_EVENTS, DAYS_OF_WEEK, INITIAL_USERS, URGENCY_CONFIGS, TURKISH_HOLIDAYS, INITIAL_DEPARTMENTS } from './constants';
 import { EventBadge } from './components/EventBadge';
 import { AddEventModal } from './components/AddEventModal';
 import { AdminModal } from './components/AdminModal';
@@ -26,6 +26,7 @@ import { NotificationPopover } from './components/NotificationPopover';
 import { LogPopover } from './components/LogPopover';
 import { ToastContainer } from './components/Toast';
 import { EventDetailsModal } from './components/EventDetailsModal';
+import { DepartmentLoginModal } from './components/DepartmentLoginModal';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
@@ -59,23 +60,20 @@ function App() {
   const [isEventsLoading, setIsEventsLoading] = useState(true);
   const [isUsersLoading, setIsUsersLoading] = useState(true);
 
-  // IP Config is stored as a single document in 'settings' collection
-  const [ipConfig, setIpConfig] = useState<IpAccessConfig>({
-    designerIps: IP_ACCESS_CONFIG.DESIGNER_IPS,
-    departmentIps: { ...IP_ACCESS_CONFIG.DEPARTMENT_IPS }
-  });
+  // Department Users for login system (stored in Firestore)
+  const [departmentUsers, setDepartmentUsers] = useState<DepartmentUser[]>([]);
+  const [loggedInDeptUser, setLoggedInDeptUser] = useState<DepartmentUser | null>(null);
+  const [isDeptLoginOpen, setIsDeptLoginOpen] = useState(false);
 
   // Logs and Notifications
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
 
   // Local UI State
-  const [currentIp, setCurrentIp] = useState<string>('');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [isFetchingIp, setIsFetchingIp] = useState(true);
 
   // Search & Filter State
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -88,26 +86,6 @@ function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<Date>(new Date());
   const [viewEvent, setViewEvent] = useState<CalendarEvent | null>(null);
-
-  // --- IP DETECTION LOGIC ---
-  useEffect(() => {
-    const fetchPublicIp = async () => {
-      try {
-        setIsFetchingIp(true);
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
-        setCurrentIp(data.ip);
-        console.log("Detected Public IP:", data.ip);
-      } catch (error) {
-        console.error("Could not fetch IP:", error);
-        addToast('IP adresi algılanamadı.', 'info');
-      } finally {
-        setIsFetchingIp(false);
-      }
-    };
-
-    fetchPublicIp();
-  }, []);
 
   // --- FIREBASE LISTENERS (REAL-TIME SYNC) ---
 
@@ -154,26 +132,16 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // 4. Sync Settings (IP Config)
+  // 4. Sync Department Users (for login system)
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, "settings", "ipConfig"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        // Handle migration from old single designerIp to array
-        const designerIps = data.designerIps || (data.designerIp ? [data.designerIp] : IP_ACCESS_CONFIG.DESIGNER_IPS);
-        setIpConfig({
-          designerIps: designerIps,
-          departmentIps: data.departmentIps || {}
-        });
-      } else {
-        // Initialize if empty
-        const initialConfig: IpAccessConfig = {
-          designerIps: IP_ACCESS_CONFIG.DESIGNER_IPS,
-          departmentIps: IP_ACCESS_CONFIG.DEPARTMENT_IPS
-        };
-        setDoc(doc(db, "settings", "ipConfig"), initialConfig);
-        setIpConfig(initialConfig);
-      }
+    const q = query(collection(db, "departmentUsers"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedUsers: DepartmentUser[] = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        createdAt: doc.data().createdAt instanceof Timestamp ? doc.data().createdAt.toDate() : new Date()
+      } as DepartmentUser));
+      setDepartmentUsers(fetchedUsers);
     });
     return () => unsubscribe();
   }, []);
@@ -206,21 +174,12 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- Derived Permissions based on IP ---
-  const getRole = (ip: string) => {
-    // Check Designer IPs (Array check)
-    if (ipConfig.designerIps.includes(ip)) {
-      return { role: 'designer', departmentId: undefined };
-    }
-    // Check Department IPs
-    if (ipConfig.departmentIps[ip]) {
-      return { role: 'department_user', departmentId: ipConfig.departmentIps[ip] };
-    }
-    return { role: 'guest', departmentId: undefined };
-  };
+  // --- Derived Permissions based on Login ---
+  // Designer = logged in via Firebase Auth in AdminModal
+  // Department User = logged in via DepartmentLoginModal
+  // Guest = not logged in
 
-  const { role: userRole, departmentId: currentDepartmentId } = useMemo(() => getRole(currentIp), [currentIp, ipConfig]);
-
+  const currentDepartmentId = loggedInDeptUser?.departmentId || undefined;
   const currentDepartmentName = useMemo(() => {
     if (currentDepartmentId) {
       return departments.find(d => d.id === currentDepartmentId)?.name;
@@ -228,7 +187,9 @@ function App() {
     return null;
   }, [currentDepartmentId, departments]);
 
-  const isDesigner = userRole === 'designer';
+  // For now, isDesigner is determined by whether user clicks admin button and logs in with Firebase Auth
+  // The main calendar is public by default, but edit functions are protected
+  const [isDesigner, setIsDesigner] = useState(false);
 
   // --- EmailJS Initialization ---
   useEffect(() => {
@@ -327,13 +288,12 @@ function App() {
     }
   };
 
-  const handleAddUser = async (name: string, email: string, emoji: string, avatarUrl?: string) => {
+  const handleAddUser = async (name: string, email: string, emoji: string) => {
     try {
       await addDoc(collection(db, "users"), {
         name,
         email,
-        emoji,
-        avatarUrl: avatarUrl || ''
+        emoji
       });
       addToast(`${name} başarıyla eklendi.`, 'success');
     } catch (e) {
@@ -463,13 +423,44 @@ function App() {
     }
   };
 
-  const handleUpdateIpConfig = async (newConfig: IpAccessConfig) => {
+  const handleAddDepartmentUser = async (username: string, password: string, departmentId: string, isDesignerRole: boolean) => {
     try {
-      await setDoc(doc(db, "settings", "ipConfig"), newConfig);
-      addToast('Erişim ayarları güncellendi.', 'success');
+      await addDoc(collection(db, "departmentUsers"), {
+        username,
+        password,
+        departmentId,
+        isDesigner: isDesignerRole,
+        createdAt: Timestamp.now()
+      });
+      addToast(`${username} kullanıcısı eklendi.`, 'success');
     } catch (e) {
-      addToast('Ayarlar kaydedilemedi.', 'info');
+      addToast('Kullanıcı eklenemedi.', 'info');
     }
+  };
+
+  const handleDeleteDepartmentUser = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "departmentUsers", id));
+      addToast('Kullanıcı silindi.', 'info');
+    } catch (e) {
+      addToast('Silme hatası.', 'info');
+    }
+  };
+
+  const handleDepartmentLogin = (user: DepartmentUser) => {
+    setLoggedInDeptUser(user);
+    setIsDeptLoginOpen(false);
+    // If user has designer role, set isDesigner state
+    if (user.isDesigner) {
+      setIsDesigner(true);
+    }
+    addToast(`${user.username} olarak giriş yapıldı.`, 'success');
+  };
+
+  const handleDepartmentLogout = () => {
+    setLoggedInDeptUser(null);
+    setIsDesigner(false);
+    addToast('Çıkış yapıldı.', 'info');
   };
 
   const handleAddEvent = async (
@@ -566,6 +557,32 @@ function App() {
       addToast('Kampanya silindi.', 'info');
     } catch (e) {
       addToast('Silme hatası.', 'info');
+    }
+  };
+
+  const handleEditEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
+    try {
+      const updateData: any = { ...updates };
+
+      // Convert Date to Timestamp if date is being updated
+      if (updates.date && updates.date instanceof Date) {
+        updateData.date = Timestamp.fromDate(updates.date);
+      }
+
+      await setDoc(doc(db, "events", eventId), updateData, { merge: true });
+      addToast('Kampanya güncellendi.', 'success');
+
+      // Close the details modal after successful edit
+      setViewEvent(null);
+
+      // Log the edit
+      await addDoc(collection(db, "logs"), {
+        message: `Kampanya güncellendi: ${updates.title || 'Başlık değiştirilmedi'} (ID: ${eventId.substring(0, 6).toUpperCase()})`,
+        timestamp: Timestamp.now()
+      });
+    } catch (e) {
+      console.error('Edit error:', e);
+      addToast('Güncelleme hatası.', 'info');
     }
   };
 
@@ -669,9 +686,9 @@ function App() {
                   </button>
                 )}
               </h1>
-              {isFetchingIp && (
-                <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
-                  <Loader2 size={10} className="animate-spin" /> IP Algılanıyor...
+              {loggedInDeptUser && (
+                <div className="flex items-center gap-2 mt-1 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded">
+                  <LogIn size={12} /> {currentDepartmentName} Birimi olarak giriş yapıldı
                 </div>
               )}
               {isSendingEmail && (
@@ -931,7 +948,7 @@ function App() {
                       if (isDesigner) {
                         isBlurred = false;
                         isClickable = true;
-                      } else if (userRole === 'department_user') {
+                      } else if (loggedInDeptUser) {
                         if (isMyDeptInfo) {
                           // My department: Clear but Read-Only
                           isBlurred = false;
@@ -976,20 +993,24 @@ function App() {
           </div>
         </div> {/* End of printable-calendar */}
 
-        {/* IP Display (Bottom Left) */}
-        <div className="fixed bottom-4 left-4 z-40">
-          <div className={`
-                px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-mono opacity-80 backdrop-blur-sm
-                ${ipConfig.designerIps.includes(currentIp)
-              ? 'bg-violet-900/90 text-white'
-              : 'bg-gray-800/90 text-white'}
-            `}
-          >
-            <Network size={12} />
-            <span>
-              {currentIp ? `IP: ${currentIp}` : 'IP Yok'}
-            </span>
-          </div>
+        {/* Login/Logout Buttons (Bottom Left) */}
+        <div className="fixed bottom-4 left-4 z-40 flex gap-2">
+          {!loggedInDeptUser && !isDesigner && (
+            <button
+              onClick={() => setIsDeptLoginOpen(true)}
+              className="px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-medium bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+            >
+              <LogIn size={14} /> Birim Girişi
+            </button>
+          )}
+          {loggedInDeptUser && (
+            <button
+              onClick={handleDepartmentLogout}
+              className="px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors"
+            >
+              <LogOut size={14} /> Çıkış
+            </button>
+          )}
         </div>
 
         <AddEventModal
@@ -1013,9 +1034,11 @@ function App() {
           onDeleteAllEvents={handleDeleteAllEvents}
           onAddDepartment={handleAddDepartment}
           onDeleteDepartment={handleDeleteDepartment}
-          ipConfig={ipConfig}
-          onUpdateIpConfig={handleUpdateIpConfig}
+          departmentUsers={departmentUsers}
+          onAddDepartmentUser={handleAddDepartmentUser}
+          onDeleteDepartmentUser={handleDeleteDepartmentUser}
           onBulkAddEvents={handleBulkAddEvents}
+          onSetIsDesigner={setIsDesigner}
         />
 
         <EventDetailsModal
@@ -1023,6 +1046,17 @@ function App() {
           onClose={() => setViewEvent(null)}
           assignee={users.find(u => u.id === viewEvent?.assigneeId)}
           departments={departments}
+          users={users}
+          isDesigner={isDesigner}
+          onEdit={handleEditEvent}
+        />
+
+        <DepartmentLoginModal
+          isOpen={isDeptLoginOpen}
+          onClose={() => setIsDeptLoginOpen(false)}
+          departmentUsers={departmentUsers}
+          departments={departments}
+          onLogin={handleDepartmentLogin}
         />
 
         <ToastContainer toasts={toasts} removeToast={removeToast} />
