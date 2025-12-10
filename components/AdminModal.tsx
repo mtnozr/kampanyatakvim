@@ -6,6 +6,8 @@ import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { auth } from '../firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -13,7 +15,7 @@ interface AdminModalProps {
   users: User[];
   events: CalendarEvent[];
   departments: Department[];
-  onAddUser: (name: string, email: string, emoji: string) => void;
+  onAddUser: (name: string, email: string, emoji: string, avatarUrl?: string) => void;
   onDeleteUser: (id: string) => void;
   onDeleteEvent: (id: string) => void;
   onDeleteAllEvents: () => void;
@@ -53,6 +55,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState<string>('');
 
   // Department Form States
   const [newDeptName, setNewDeptName] = useState('');
@@ -102,7 +107,24 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setAvatarFile(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      // Clear emoji selection
+      setSelectedEmoji('');
+    }
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!newName.trim() || !newEmail.trim()) {
@@ -110,18 +132,44 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return;
     }
 
-    if (!selectedEmoji) {
-      setError('Lütfen bir emoji/avatar seçiniz.');
+    if (!selectedEmoji && !avatarFile) {
+      setError('Lütfen bir emoji seçiniz veya fotoğraf yükleyiniz.');
       return;
     }
 
-    onAddUser(newName, newEmail, selectedEmoji);
+    setIsUploading(true);
 
-    // Reset form
-    setNewName('');
-    setNewEmail('');
-    setSelectedEmoji('');
-    setError('');
+    try {
+      let avatarUrl = '';
+
+      if (avatarFile) {
+        // Upload file
+        const timestamp = Date.now();
+        const fileRef = ref(storage, `user-avatars/${timestamp}_${avatarFile.name}`);
+        const snapshot = await uploadBytes(fileRef, avatarFile);
+        avatarUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      // We pass generic emoji if avatar exists, or the selected emoji
+      // If avatarUrl exists, EventBadge prefers it over emoji.
+      // But we can pass a fallback emoji just in case.
+      const emojiToSave = selectedEmoji || '👤';
+
+      await onAddUser(newName, newEmail, emojiToSave, avatarUrl);
+
+      // Reset form
+      setNewName('');
+      setNewEmail('');
+      setSelectedEmoji('');
+      setAvatarFile(null);
+      setUploadPreview('');
+      setError('');
+    } catch (err: any) {
+      console.error(err);
+      setError('Kullanıcı eklenirken hata oluştu: ' + err.message);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleAddDeptSubmit = (e: React.FormEvent) => {
@@ -446,8 +494,44 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-2 block">Avatar Seçimi</label>
-                        <div className="grid grid-cols-8 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100 max-h-32 overflow-y-auto custom-scrollbar">
+                        <label className="text-xs font-semibold text-gray-500 mb-2 block">Avatar Seçimi (Emoji veya Fotoğraf)</label>
+
+                        {/* File Upload Area */}
+                        <div className="mb-3">
+                          <label
+                            className={`
+                              flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors
+                              ${avatarFile ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-gray-200 hover:border-violet-400 text-gray-500'}
+                            `}
+                          >
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileSelect}
+                              className="hidden"
+                            />
+                            {uploadPreview ? (
+                              <div className="flex items-center gap-3">
+                                <img src={uploadPreview} alt="Preview" className="w-8 h-8 rounded-full object-cover shadow-sm bg-white" />
+                                <span className="text-sm font-medium">Fotoğraf Seçildi Değiştir</span>
+                              </div>
+                            ) : (
+                              <>
+                                <Upload size={18} />
+                                <span className="text-sm">Fotoğraf Seç (İsteğe Bağlı)</span>
+                              </>
+                            )}
+                          </label>
+                        </div>
+
+                        {/* Emoji Divider */}
+                        <div className="relative flex py-2 items-center">
+                          <div className="flex-grow border-t border-gray-100"></div>
+                          <span className="flex-shrink-0 mx-2 text-[10px] text-gray-400 font-medium uppercase">Veya Emoji Seç</span>
+                          <div className="flex-grow border-t border-gray-100"></div>
+                        </div>
+
+                        <div className={`grid grid-cols-8 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100 max-h-32 overflow-y-auto custom-scrollbar ${avatarFile ? 'opacity-50 pointer-events-none' : ''}`}>
                           {AVAILABLE_EMOJIS.map((emoji) => (
                             <button
                               key={emoji}
@@ -468,8 +552,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                       <div className="flex justify-between items-center pt-2">
                         <p className="text-red-500 text-xs h-4">{error}</p>
-                        <button type="submit" className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 flex items-center gap-2 shadow-lg shadow-violet-200 text-sm">
-                          <Plus size={16} /> Ekle
+                        <button
+                          type="submit"
+                          disabled={isUploading}
+                          className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 flex items-center gap-2 shadow-lg shadow-violet-200 text-sm disabled:opacity-70 disabled:cursor-wait"
+                        >
+                          {isUploading ? (
+                            <>Yükleniyor...</>
+                          ) : (
+                            <><Plus size={16} /> Ekle</>
+                          )}
                         </button>
                       </div>
                     </form>

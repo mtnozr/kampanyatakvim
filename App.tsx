@@ -327,12 +327,13 @@ function App() {
     }
   };
 
-  const handleAddUser = async (name: string, email: string, emoji: string) => {
+  const handleAddUser = async (name: string, email: string, emoji: string, avatarUrl?: string) => {
     try {
       await addDoc(collection(db, "users"), {
         name,
         email,
-        emoji
+        emoji,
+        avatarUrl: avatarUrl || ''
       });
       addToast(`${name} başarıyla eklendi.`, 'success');
     } catch (e) {
