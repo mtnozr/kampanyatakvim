@@ -608,7 +608,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           <p className="text-gray-500 text-sm">Henüz kampanya bulunmuyor.</p>
                         </div>
                       ) : (
-                        events.map(event => {
+                        [...events].sort((a, b) => b.date.getTime() - a.date.getTime()).map(event => {
                           const config = URGENCY_CONFIGS[event.urgency];
                           return (
                             <div key={event.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between group hover:shadow-sm transition-all">
