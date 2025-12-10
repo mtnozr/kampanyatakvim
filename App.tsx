@@ -529,12 +529,14 @@ function App() {
         }
 
         const footerIdText = `Ref ID: #${newEventId.substring(0, 6).toUpperCase()}`;
+        const emailSubject = `${title} - Kampanya Görev Ataması`;
+
         const templateParams = {
           to_email: assignedUser.email,
           to_name: assignedUser.name,
           name: assignedUser.name,
           email: assignedUser.email,
-          title: title,
+          title: emailSubject,
           message: emailMessage,
           ref_id: footerIdText,
         };
@@ -546,7 +548,7 @@ function App() {
           console.error('❌ E-posta Hatası:', error);
           addToast('Mail istemcisi açılıyor...', 'info');
           setTimeout(() => {
-            const subject = encodeURIComponent(`ACİL: Görev Ataması: ${title}`);
+            const subject = encodeURIComponent(`ACİL: Görev Ataması: ${title} - Kampanya Görev Ataması`);
             const body = encodeURIComponent(`Sayın ${assignedUser.name},\n\n${emailMessage}\n\n----------------\n${footerIdText}`);
             window.location.href = `mailto:${assignedUser.email}?subject=${subject}&body=${body}&importance=High`;
           }, 1000);
