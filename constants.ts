@@ -51,7 +51,7 @@ export const INITIAL_DEPARTMENTS: Department[] = [
 
 // --- IP ACCESS CONTROL CONFIGURATION ---
 export const IP_ACCESS_CONFIG = {
-  DESIGNER_IP: '88.243.155.218', // Admin/Designer Access (Full)
+  DESIGNER_IPS: ['88.243.155.218'], // Admin/Designer Access (Full)
   DEPARTMENT_IPS: {
     '192.168.1.20': 'd1', // Pazarlama
     '192.168.1.21': 'd2', // İK

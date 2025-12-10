@@ -60,7 +60,7 @@ function App() {
 
   // IP Config is stored as a single document in 'settings' collection
   const [ipConfig, setIpConfig] = useState<IpAccessConfig>({
-    designerIp: IP_ACCESS_CONFIG.DESIGNER_IP,
+    designerIps: IP_ACCESS_CONFIG.DESIGNER_IPS,
     departmentIps: { ...IP_ACCESS_CONFIG.DEPARTMENT_IPS }
   });
 
@@ -157,14 +157,21 @@ function App() {
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "settings", "ipConfig"), (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data() as IpAccessConfig;
-        setIpConfig(data);
-      } else {
-        // Init default if missing
-        setDoc(doc(db, "settings", "ipConfig"), {
-          designerIp: IP_ACCESS_CONFIG.DESIGNER_IP,
-          departmentIps: IP_ACCESS_CONFIG.DEPARTMENT_IPS
+        const data = docSnap.data();
+        // Handle migration from old single designerIp to array
+        const designerIps = data.designerIps || (data.designerIp ? [data.designerIp] : IP_ACCESS_CONFIG.DESIGNER_IPS);
+        setIpConfig({
+          designerIps: designerIps,
+          departmentIps: data.departmentIps || {}
         });
+      } else {
+        // Initialize if empty
+        const initialConfig: IpAccessConfig = {
+          designerIps: IP_ACCESS_CONFIG.DESIGNER_IPS,
+          departmentIps: IP_ACCESS_CONFIG.DEPARTMENT_IPS
+        };
+        setDoc(doc(db, "settings", "ipConfig"), initialConfig);
+        setIpConfig(initialConfig);
       }
     });
     return () => unsubscribe();
@@ -199,18 +206,19 @@ function App() {
   }, []);
 
   // --- Derived Permissions based on IP ---
-  const userRole = useMemo(() => {
-    if (currentIp === ipConfig.designerIp) return 'designer';
-    if (ipConfig.departmentIps[currentIp]) return 'department_user';
-    return 'guest';
-  }, [currentIp, ipConfig]);
-
-  const currentDepartmentId = useMemo(() => {
-    if (userRole === 'department_user') {
-      return ipConfig.departmentIps[currentIp];
+  const getRole = (ip: string) => {
+    // Check Designer IPs (Array check)
+    if (ipConfig.designerIps.includes(ip)) {
+      return { role: 'designer', departmentId: undefined };
     }
-    return null;
-  }, [currentIp, userRole, ipConfig]);
+    // Check Department IPs
+    if (ipConfig.departmentIps[ip]) {
+      return { role: 'department_user', departmentId: ipConfig.departmentIps[ip] };
+    }
+    return { role: 'guest', departmentId: undefined };
+  };
+
+  const { role: userRole, departmentId: currentDepartmentId } = useMemo(() => getRole(currentIp), [currentIp, ipConfig]);
 
   const currentDepartmentName = useMemo(() => {
     if (currentDepartmentId) {

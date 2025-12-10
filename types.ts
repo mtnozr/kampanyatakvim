@@ -52,6 +52,6 @@ export interface ToastMessage {
 }
 
 export interface IpAccessConfig {
-  designerIp: string;
+  designerIps: string[];
   departmentIps: Record<string, string>; // key: IP Address, value: Department ID
 }

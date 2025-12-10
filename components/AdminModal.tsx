@@ -55,7 +55,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [newDeptName, setNewDeptName] = useState('');
 
   // Access / IP Form States
-  const [tempDesignerIp, setTempDesignerIp] = useState(ipConfig?.designerIp || '');
+  const [newDesignerIp, setNewDesignerIp] = useState('');
   const [newMapIp, setNewMapIp] = useState('');
   const [newMapDeptId, setNewMapDeptId] = useState('');
 
@@ -133,16 +133,33 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   // --- Access Management Handlers ---
-  const handleUpdateDesignerIp = () => {
-    if (!tempDesignerIp.trim()) {
-      setError('Admin IP boş olamaz.');
+  const handleAddDesignerIp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDesignerIp.trim()) {
+      setError('IP adresi boş olamaz.');
       return;
     }
+    const currentIps = ipConfig.designerIps || [];
+    if (currentIps.includes(newDesignerIp)) {
+      setError('Bu IP zaten ekli.');
+      return;
+    }
+
     onUpdateIpConfig({
       ...ipConfig,
-      designerIp: tempDesignerIp
+      designerIps: [...currentIps, newDesignerIp]
     });
+    setNewDesignerIp('');
     setError('');
+  };
+
+  const handleRemoveDesignerIp = (ipToRemove: string) => {
+    const currentIps = ipConfig.designerIps || [];
+    const newIps = currentIps.filter(ip => ip !== ipToRemove);
+    onUpdateIpConfig({
+      ...ipConfig,
+      designerIps: newIps
+    });
   };
 
   const handleAddIpMapping = (e: React.FormEvent) => {
@@ -434,24 +451,46 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-2">
                       <ShieldCheck size={14} /> Admin (Designer) Erişimi
                     </h3>
-                    <div className="flex gap-3 items-end">
+
+                    {/* Add Designer IP Form */}
+                    <form onSubmit={handleAddDesignerIp} className="flex gap-3 items-end">
                       <div className="flex-1">
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">Designer IP Adresi</label>
+                        <label className="text-xs font-semibold text-gray-500 mb-1 block">Yeni Admin IP Ekle</label>
                         <input
                           type="text"
-                          value={tempDesignerIp}
-                          onChange={(e) => setTempDesignerIp(e.target.value)}
-                          placeholder="Örn: 192.168.1.10"
+                          value={newDesignerIp}
+                          onChange={(e) => setNewDesignerIp(e.target.value)}
+                          placeholder="Örn: 88.243..."
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 outline-none text-sm font-mono"
                         />
                       </div>
                       <button
-                        type="button"
-                        onClick={handleUpdateDesignerIp}
-                        className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm"
+                        type="submit"
+                        className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm flex items-center gap-2"
                       >
-                        Güncelle
+                        <Plus size={16} /> Ekle
                       </button>
+                    </form>
+
+                    {/* Designer IPs List */}
+                    <div className="space-y-2 mt-2">
+                      {(ipConfig.designerIps || []).map((ip) => (
+                        <div key={ip} className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                          <code className="text-sm text-slate-700 font-mono font-bold">{ip}</code>
+                          <button
+                            onClick={() => handleRemoveDesignerIp(ip)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                            title="IP'yi Sil"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      {(ipConfig.designerIps || []).length === 0 && (
+                        <p className="text-xs text-orange-500 bg-orange-50 p-2 rounded border border-orange-100 italic">
+                          ⚠️ Hiçbir yönetici IP adresi tanımlı değil.
+                        </p>
+                      )}
                     </div>
                   </div>
 
