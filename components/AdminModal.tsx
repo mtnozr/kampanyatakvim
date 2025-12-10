@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Plus, ShieldCheck, Lock, Users, Calendar, AlertTriangle, Building, Network, LogOut } from 'lucide-react';
+import { X, Trash2, Plus, ShieldCheck, Lock, Users, Calendar, AlertTriangle, Building, Network, LogOut, FileText, Download, Upload } from 'lucide-react';
 import { User, CalendarEvent, Department, IpAccessConfig } from '../types';
 import { AVAILABLE_EMOJIS, URGENCY_CONFIGS } from '../constants';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ interface AdminModalProps {
   onDeleteDepartment: (id: string) => void;
   ipConfig: IpAccessConfig;
   onUpdateIpConfig: (config: IpAccessConfig) => void;
+  onBulkAddEvents: (events: Partial<CalendarEvent>[]) => Promise<void>;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -36,12 +37,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onAddDepartment,
   onDeleteDepartment,
   ipConfig,
-  onUpdateIpConfig
+  onUpdateIpConfig,
+  onBulkAddEvents
 }) => {
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'departments' | 'access'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'departments' | 'access' | 'import-export'>('users');
+  const [importText, setImportText] = useState('');
 
   // Loading state for auth check
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -198,6 +201,109 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     onUpdateIpConfig({ ...ipConfig, departmentIps: updatedMap });
   };
 
+  // --- Import / Export Handlers ---
+  const handleExportCSV = () => {
+    // Header
+    let csvContent = "Title,Date,Urgency,Description,Department,Assignee\n";
+
+    events.forEach(ev => {
+      const dept = departments.find(d => d.id === ev.departmentId)?.name || '';
+      const user = users.find(u => u.id === ev.assigneeId)?.name || '';
+      const dateStr = format(ev.date, 'yyyy-MM-dd');
+      // Escape commas in content
+      const safeTitle = `"${ev.title.replace(/"/g, '""')}"`;
+      const safeDesc = `"${(ev.description || '').replace(/"/g, '""')}"`;
+      const safeDept = `"${dept.replace(/"/g, '""')}"`;
+      const safeUser = `"${user.replace(/"/g, '""')}"`;
+
+      csvContent += `${safeTitle},${dateStr},${ev.urgency},${safeDesc},${safeDept},${safeUser}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `kampanya_takvimi_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportCSV = async () => {
+    if (!importText.trim()) {
+      setError('Lütfen CSV verisi giriniz.');
+      return;
+    }
+
+    try {
+      const lines = importText.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase()); // Title, Date, Urgency...
+
+      // Basic validation
+      if (lines.length < 2) {
+        setError('CSV içeriği boş veya sadece başlıktan oluşuyor.');
+        return;
+      }
+
+      const newEvents: Partial<CalendarEvent>[] = [];
+
+      // Helper to parse CSV line respecting quotes
+      const parseCSVLine = (line: string) => {
+        const result = [];
+        let start = 0;
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          if (line[i] === '"') inQuotes = !inQuotes;
+          else if (line[i] === ',' && !inQuotes) {
+            result.push(line.substring(start, i).replace(/^"|"$/g, '').replace(/""/g, '"'));
+            start = i + 1;
+          }
+        }
+        result.push(line.substring(start).replace(/^"|"$/g, '').replace(/""/g, '"'));
+        return result;
+      };
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const cols = parseCSVLine(line);
+        // Map based on index assuming standard order: Title, Date, Urgency, Desc, Dept, Assignee
+        // Or strictly strictly follow the order we export: Title,Date,Urgency,Description,Department,Assignee
+
+        if (cols.length < 3) continue; // Skip invalid lines
+
+        const title = cols[0];
+        const dateStr = cols[1];
+        const urgency = cols[2] as any;
+        const description = cols[3];
+        const deptName = cols[4];
+        const userName = cols[5];
+
+        // Resolve IDs
+        const deptId = departments.find(d => d.name === deptName)?.id;
+        const assigneeId = users.find(u => u.name === userName)?.id;
+
+        newEvents.push({
+          title,
+          date: new Date(dateStr),
+          urgency: URGENCY_CONFIGS[urgency] ? urgency : 'Medium',
+          description,
+          departmentId: deptId,
+          assigneeId: assigneeId
+        });
+      }
+
+      await onBulkAddEvents(newEvents);
+      setImportText('');
+      setError('');
+
+    } catch (e) {
+      console.error(e);
+      setError('Import hatası: CSV formatını kontrol ediniz.');
+    }
+  };
+
   const handleDeleteAllClick = () => {
     if (isDeleteConfirming) {
       onDeleteAllEvents();
@@ -291,6 +397,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 className={`flex-1 py-3 px-2 text-xs md:text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'access' ? 'border-violet-600 text-violet-600 bg-violet-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               >
                 <Network size={16} /> Erişim
+              </button>
+              <button
+                onClick={() => setActiveTab('import-export')}
+                className={`flex-1 py-3 px-2 text-xs md:text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'import-export' ? 'border-violet-600 text-violet-600 bg-violet-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              >
+                <FileText size={16} /> İçe/Dışa Aktar
               </button>
               <button
                 onClick={() => setActiveTab('events')}
@@ -639,6 +751,68 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         })
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- IMPORT / EXPORT TAB --- */}
+              {activeTab === 'import-export' && (
+                <div className="flex flex-col h-full bg-slate-50">
+                  <div className="p-6 space-y-8">
+
+                    {/* Export Section */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-violet-100 text-violet-600 rounded-lg">
+                          <Download size={24} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-bold text-gray-800 mb-1">Dışa Aktar (CSV)</h3>
+                          <p className="text-xs text-gray-500 mb-4">
+                            Mevcut tüm kampanyaları, birimleri ve atanan kişileri içeren bir CSV dosyası indirir.
+                            Yedekleme veya Excel'de raporlama için kullanabilirsiniz.
+                          </p>
+                          <button
+                            onClick={handleExportCSV}
+                            className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 flex items-center gap-2"
+                          >
+                            <Download size={16} /> İndir (.csv)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Import Section */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
+                          <Upload size={24} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-bold text-gray-800 mb-1">İçe Aktar (CSV Yükle)</h3>
+                          <p className="text-xs text-gray-500 mb-4">
+                            CSV formatındaki verileri yapıştırarak toplu kampanya ekleyebilirsiniz.
+                            Format: `Title, Date, Urgency, Description, Department, Assignee`
+                          </p>
+                          <textarea
+                            value={importText}
+                            onChange={(e) => setImportText(e.target.value)}
+                            className="w-full h-32 p-3 text-xs font-mono border rounded-lg mb-3 focus:ring-2 focus:ring-emerald-500 outline-none"
+                            placeholder='Örn: "Yaz Kampanyası",2024-06-01,High,"Açıklama","Pazarlama","Ahmet Yılmaz"'
+                          />
+                          <div className="flex justify-between items-center">
+                            {error && <span className="text-red-500 text-xs">{error}</span>}
+                            <button
+                              onClick={handleImportCSV}
+                              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-start gap-2 ml-auto"
+                            >
+                              <Upload size={16} /> İçe Aktar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               )}

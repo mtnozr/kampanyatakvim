@@ -38,7 +38,8 @@ import {
   query,
   orderBy,
   Timestamp,
-  setDoc
+  setDoc,
+  writeBatch
 } from 'firebase/firestore';
 
 // --- EMAILJS CONFIGURATION ---
@@ -565,6 +566,36 @@ function App() {
     }
   };
 
+  const handleBulkAddEvents = async (newEvents: Partial<CalendarEvent>[]) => {
+    try {
+      const batch = writeBatch(db);
+
+      newEvents.forEach(evt => {
+        const docRef = doc(collection(db, "events"));
+        // Ensure date is a proper Date object or Timestamp
+        const eventData = {
+          ...evt,
+          date: evt.date instanceof Date ? Timestamp.fromDate(evt.date) : evt.date,
+        };
+        batch.set(docRef, eventData);
+      });
+
+      await batch.commit();
+      addToast(`${newEvents.length} kampanya başarıyla eklendi.`, 'success');
+
+      // Log generic bulk action
+      await addDoc(collection(db, "logs"), {
+        message: `${newEvents.length} adet kampanya toplu olarak içe aktarıldı via CSV.`,
+        timestamp: Timestamp.now()
+      });
+
+    } catch (e) {
+      console.error(e);
+      addToast('Toplu ekleme sırasında hata oluştu.', 'info');
+      throw e; // Propagate error to caller
+    }
+  };
+
   const handleDeleteAllEvents = async () => {
     try {
       events.forEach(async (ev) => {
@@ -981,6 +1012,7 @@ function App() {
           onDeleteDepartment={handleDeleteDepartment}
           ipConfig={ipConfig}
           onUpdateIpConfig={handleUpdateIpConfig}
+          onBulkAddEvents={handleBulkAddEvents}
         />
 
         <EventDetailsModal
