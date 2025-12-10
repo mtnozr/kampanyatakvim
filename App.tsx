@@ -946,7 +946,7 @@ function App() {
         <div className="fixed bottom-4 left-4 z-40">
           <div className={`
                 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-mono opacity-80 backdrop-blur-sm
-                ${currentIp === ipConfig.designerIp
+                ${ipConfig.designerIps.includes(currentIp)
               ? 'bg-violet-900/90 text-white'
               : 'bg-gray-800/90 text-white'}
             `}
