@@ -48,6 +48,12 @@ const EMAILJS_SERVICE_ID = 'service_q4mufkj';
 const EMAILJS_TEMPLATE_ID = 'template_mtdrews';
 const EMAILJS_PUBLIC_KEY = 'RBWpN3vQtjsZQGEKl';
 
+// Normalize urgency values coming from Firestore to avoid crashes on bad data
+const normalizeUrgency = (urgency: any): UrgencyLevel => {
+  const validUrgencies: UrgencyLevel[] = ['Very High', 'High', 'Medium', 'Low'];
+  return validUrgencies.includes(urgency) ? urgency : 'Low';
+};
+
 function App() {
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -96,10 +102,12 @@ function App() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedEvents: CalendarEvent[] = snapshot.docs.map(doc => {
         const data = doc.data();
+        const urgency = normalizeUrgency(data.urgency);
+
         return {
           id: doc.id,
           title: data.title,
-          urgency: data.urgency,
+          urgency,
           assigneeId: data.assigneeId,
           description: data.description,
           departmentId: data.departmentId,

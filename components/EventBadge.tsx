@@ -18,7 +18,7 @@ export const EventBadge: React.FC<EventBadgeProps> = ({
   isBlurred = false,
   isClickable = true
 }) => {
-  const config = URGENCY_CONFIGS[event.urgency];
+  const config = URGENCY_CONFIGS[event.urgency] ?? URGENCY_CONFIGS['Low'];
 
   const renderAvatar = () => {
     if (!user) {
