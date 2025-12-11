@@ -76,7 +76,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
       setIsAuthLoading(false);
-      onSetIsDesigner(!!user);
+      // Only set isDesigner to true if Firebase user exists
+      // Don't set to false - that would override cookie-based department user login
+      if (user) {
+        onSetIsDesigner(true);
+      }
     });
     return () => unsubscribe();
   }, [onSetIsDesigner]);
