@@ -1149,7 +1149,7 @@ function App() {
               onClick={() => setIsDeptLoginOpen(true)}
               className="px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-medium bg-teal-600 text-white hover:bg-teal-700 transition-colors"
             >
-              <LogIn size={14} /> Birim Girişi
+              <LogIn size={14} /> Kullanıcı Girişi
             </button>
           )}
         </div>
