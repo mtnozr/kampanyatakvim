@@ -202,9 +202,7 @@ function App() {
   // --- EmailJS Initialization ---
   useEffect(() => {
     try {
-      emailjs.init({
-        publicKey: EMAILJS_PUBLIC_KEY,
-      });
+      emailjs.init(EMAILJS_PUBLIC_KEY);
     } catch (error) {
       console.warn('EmailJS Init Error:', error);
     }
