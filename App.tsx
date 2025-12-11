@@ -204,7 +204,9 @@ function App() {
   // Restore designer state from cookie (runs once on mount)
   useEffect(() => {
     const savedDesignerAuth = getCookie('designer_auth');
+    console.log('🍪 Cookie Check - designer_auth:', savedDesignerAuth);
     if (savedDesignerAuth === 'true') {
+      console.log('✅ Setting isDesigner to true from cookie');
       setIsDesigner(true);
     }
   }, []);
@@ -475,15 +477,19 @@ function App() {
   };
 
   const handleDepartmentLogin = (user: DepartmentUser) => {
+    console.log('🔐 Login - user:', user);
+    console.log('🔐 Login - user.isDesigner:', user.isDesigner);
     setLoggedInDeptUser(user);
     setIsDeptLoginOpen(false);
     // If user has designer role, set isDesigner state
     if (user.isDesigner) {
+      console.log('✅ Setting designer cookie');
       setIsDesigner(true);
       setCookie('designer_auth', 'true', 30);
     }
     // Save user ID to cookie for auto-login
     setCookie('dept_user_id', user.id, 30);
+    console.log('🍪 Cookies set - designer_auth:', getCookie('designer_auth'), 'dept_user_id:', getCookie('dept_user_id'));
     addToast(`${user.username} olarak giriş yapıldı.`, 'success');
   };
 
