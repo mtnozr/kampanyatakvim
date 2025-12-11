@@ -727,8 +727,8 @@ function App() {
                       Kampanya Yönetimi Takvimi (CRM)
                     </span>
                   ) : (
-                    <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm font-black uppercase">
-                      {`Takvim: ${currentDepartmentName || 'Misafir Görünümü'}`}
+                    <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm font-black">
+                      {`Takvim: ${(currentDepartmentName || 'Misafir Görünümü').toLocaleUpperCase('tr-TR')}`}
                     </span>
                   )}
                   {!isDesigner && (
