@@ -1,6 +1,6 @@
 import React from 'react';
 import { CalendarEvent, User } from '../types';
-import { URGENCY_CONFIGS } from '../constants';
+import { URGENCY_CONFIGS, STATUS_STYLES } from '../constants';
 import { User as UserIcon } from 'lucide-react';
 
 interface EventBadgeProps {
@@ -18,7 +18,10 @@ export const EventBadge: React.FC<EventBadgeProps> = ({
   isBlurred = false,
   isClickable = true
 }) => {
-  const config = URGENCY_CONFIGS[event.urgency] ?? URGENCY_CONFIGS['Low'];
+  // Eğer status varsa STATUS_STYLES, yoksa URGENCY_CONFIGS kullanılır
+  const config = (event.status && STATUS_STYLES[event.status]) 
+    ? STATUS_STYLES[event.status] 
+    : (URGENCY_CONFIGS[event.urgency] ?? URGENCY_CONFIGS['Low']);
 
   const renderAvatar = () => {
     if (!user) {

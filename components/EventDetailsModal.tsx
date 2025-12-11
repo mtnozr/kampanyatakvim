@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, User as UserIcon, AlertCircle, AlignLeft, Building, Edit2, Save, XCircle, Trash2 } from 'lucide-react';
-import { CalendarEvent, User, Department, UrgencyLevel } from '../types';
-import { URGENCY_CONFIGS } from '../constants';
+import { X, Calendar, User as UserIcon, AlertCircle, AlignLeft, Building, Edit2, Save, XCircle, Trash2, CheckCircle2, XCircle as CancelIcon, Clock } from 'lucide-react';
+import { CalendarEvent, User, Department, UrgencyLevel, CampaignStatus } from '../types';
+import { URGENCY_CONFIGS, STATUS_STYLES } from '../constants';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
@@ -11,6 +11,7 @@ interface EventDetailsModalProps {
   departments: Department[];
   users: User[];
   isDesigner: boolean;
+  isKampanyaYapan?: boolean;
   onClose: () => void;
   onEdit?: (eventId: string, updates: Partial<CalendarEvent>) => void;
   onDelete?: (eventId: string) => void;
@@ -22,6 +23,7 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   departments,
   users,
   isDesigner,
+  isKampanyaYapan,
   onClose,
   onEdit,
   onDelete
@@ -33,6 +35,7 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   const [editDescription, setEditDescription] = useState('');
   const [editAssigneeId, setEditAssigneeId] = useState('');
   const [editDepartmentId, setEditDepartmentId] = useState('');
+  const [status, setStatus] = useState<CampaignStatus>('Planlandı');
 
   useEffect(() => {
     if (event) {
@@ -42,13 +45,28 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
       setEditDescription(event.description || '');
       setEditAssigneeId(event.assigneeId || '');
       setEditDepartmentId(event.departmentId || '');
+      setStatus(event.status || 'Planlandı');
     }
   }, [event]);
 
   if (!event) return null;
 
-  const config = URGENCY_CONFIGS[event.urgency];
+  // Urgency config (always fallback to Low if undefined)
+  const urgencyConfig = URGENCY_CONFIGS[event.urgency] ?? URGENCY_CONFIGS['Low'];
+  
+  // Display config based on Status if exists, otherwise Urgency
+  const displayConfig = (event.status && STATUS_STYLES[event.status]) 
+    ? STATUS_STYLES[event.status] 
+    : urgencyConfig;
+
   const department = departments.find(d => d.id === event.departmentId);
+
+  const handleStatusChange = (newStatus: CampaignStatus) => {
+    if (!onEdit) return;
+    setStatus(newStatus);
+    // Immediate update for status
+    onEdit(event.id, { status: newStatus });
+  };
 
   const handleSave = () => {
     if (!onEdit || !editTitle.trim()) return;
@@ -59,7 +77,8 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
       urgency: editUrgency,
       description: editDescription,
       assigneeId: editAssigneeId || undefined,
-      departmentId: editDepartmentId || undefined
+      departmentId: editDepartmentId || undefined,
+      status: status // Save status as well if changed during edit mode
     });
 
     setIsEditMode(false);
@@ -73,6 +92,7 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     setEditDescription(event.description || '');
     setEditAssigneeId(event.assigneeId || '');
     setEditDepartmentId(event.departmentId || '');
+    setStatus(event.status || 'Planlandı');
     setIsEditMode(false);
   };
 
@@ -88,11 +108,50 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 flex flex-col max-h-[90vh]">
 
-        {/* Header with Urgency Color */}
-        <div className={`px-6 py-4 border-b flex justify-between items-start ${config.colorBg} bg-opacity-30 shrink-0`}>
+        {/* Header with Status/Urgency Color */}
+        <div className={`px-6 py-4 border-b flex justify-between items-start ${displayConfig.colorBg} bg-opacity-30 shrink-0 transition-colors duration-300`}>
           <div className="flex-1">
-            <span className={`inline-block px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${config.colorBorder} ${config.colorText} bg-white/50 mb-2`}>
-              {config.label}
+             {/* Status Toggle UI for Authorized Users */}
+            {(isDesigner || isKampanyaYapan) && (
+              <div className="flex bg-white/50 p-1 rounded-lg border border-gray-200/50 mb-3 w-fit backdrop-blur-sm">
+                <button
+                  onClick={() => handleStatusChange('Planlandı')}
+                  className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all ${
+                    status === 'Planlandı' 
+                    ? 'bg-yellow-100 text-yellow-700 shadow-sm' 
+                    : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                  title="Planlandı"
+                >
+                  <Clock size={12} /> Planlandı
+                </button>
+                <button
+                  onClick={() => handleStatusChange('Tamamlandı')}
+                  className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all ${
+                    status === 'Tamamlandı' 
+                    ? 'bg-green-100 text-green-700 shadow-sm' 
+                    : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                  title="Tamamlandı"
+                >
+                  <CheckCircle2 size={12} /> Tamamlandı
+                </button>
+                <button
+                  onClick={() => handleStatusChange('İptal Edildi')}
+                  className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all ${
+                    status === 'İptal Edildi' 
+                    ? 'bg-red-100 text-red-700 shadow-sm' 
+                    : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                  title="İptal Edildi"
+                >
+                  <CancelIcon size={12} /> İptal
+                </button>
+              </div>
+            )}
+
+            <span className={`inline-block px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${displayConfig.colorBorder} ${displayConfig.colorText} bg-white/50 mb-2`}>
+              {displayConfig.label}
             </span>
             {isEditMode ? (
               <input
@@ -103,7 +162,9 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                 placeholder="Kampanya Başlığı"
               />
             ) : (
-              <h2 className="text-xl font-bold text-gray-800 leading-tight">{event.title}</h2>
+              <h2 className={`text-xl font-bold text-gray-800 leading-tight ${status === 'İptal Edildi' ? 'line-through opacity-60' : ''}`}>
+                {event.title}
+              </h2>
             )}
           </div>
           <button
@@ -228,7 +289,7 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                 </select>
               ) : (
                 <p className="text-sm text-gray-700 mt-1">
-                  Bu kampanya <strong>{config.label}</strong> öncelik seviyesindedir.
+                  Bu kampanya <strong>{urgencyConfig.label}</strong> öncelik seviyesindedir.
                 </p>
               )}
             </div>

@@ -1197,6 +1197,7 @@ function App() {
           departments={departments}
           users={users}
           isDesigner={isDesigner}
+          isKampanyaYapan={isKampanyaYapan}
           onEdit={handleEditEvent}
           onDelete={handleDeleteEvent}
         />

@@ -27,6 +27,27 @@ export const URGENCY_CONFIGS: Record<UrgencyLevel, UrgencyConfig> = {
   },
 };
 
+export const STATUS_STYLES: Record<string, UrgencyConfig> = {
+  'Planlandı': {
+    label: 'Planlandı',
+    colorBg: 'bg-yellow-100',
+    colorBorder: 'border-yellow-500',
+    colorText: 'text-yellow-900',
+  },
+  'Tamamlandı': {
+    label: 'Tamamlandı',
+    colorBg: 'bg-green-100',
+    colorBorder: 'border-green-500',
+    colorText: 'text-green-900',
+  },
+  'İptal Edildi': {
+    label: 'İptal Edildi',
+    colorBg: 'bg-red-50',
+    colorBorder: 'border-red-500',
+    colorText: 'text-red-900', // line-through eklenebilir
+  },
+};
+
 // Sadece kurumsal ve temel Kadın/Erkek emojileri
 export const AVAILABLE_EMOJIS = [
   '👨‍💼', '👩‍💼', // Ofis Çalışanı
