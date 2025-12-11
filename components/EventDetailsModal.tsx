@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, User as UserIcon, AlertCircle, AlignLeft, Building, Edit2, Save, XCircle } from 'lucide-react';
+import { X, Calendar, User as UserIcon, AlertCircle, AlignLeft, Building, Edit2, Save, XCircle, Trash2 } from 'lucide-react';
 import { CalendarEvent, User, Department, UrgencyLevel } from '../types';
 import { URGENCY_CONFIGS } from '../constants';
 import { format } from 'date-fns';
@@ -13,6 +13,7 @@ interface EventDetailsModalProps {
   isDesigner: boolean;
   onClose: () => void;
   onEdit?: (eventId: string, updates: Partial<CalendarEvent>) => void;
+  onDelete?: (eventId: string) => void;
 }
 
 export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
@@ -22,7 +23,8 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   users,
   isDesigner,
   onClose,
-  onEdit
+  onEdit,
+  onDelete
 }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -72,6 +74,14 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     setEditAssigneeId(event.assigneeId || '');
     setEditDepartmentId(event.departmentId || '');
     setIsEditMode(false);
+  };
+
+  const handleDelete = () => {
+    if (!onDelete || !event) return;
+    if (window.confirm(`"${event.title}" kampanyasını silmek istediğinize emin misiniz?`)) {
+      onDelete(event.id);
+      onClose();
+    }
   };
 
   return (
@@ -262,6 +272,12 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                 className="flex-1 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium text-sm flex items-center justify-center gap-2 transition-colors"
               >
                 <Edit2 size={16} /> Düzenle
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+              >
+                <Trash2 size={16} /> Sil
               </button>
               <button
                 onClick={onClose}

@@ -27,6 +27,7 @@ import { LogPopover } from './components/LogPopover';
 import { ToastContainer } from './components/Toast';
 import { EventDetailsModal } from './components/EventDetailsModal';
 import { DepartmentLoginModal } from './components/DepartmentLoginModal';
+import { setCookie, getCookie, deleteCookie } from './utils/cookies';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
@@ -198,6 +199,23 @@ function App() {
   // For now, isDesigner is determined by whether user clicks admin button and logs in with Firebase Auth
   // The main calendar is public by default, but edit functions are protected
   const [isDesigner, setIsDesigner] = useState(false);
+
+  // --- Cookie-based Auto Login ---
+  useEffect(() => {
+    const savedDesignerAuth = getCookie('designer_auth');
+    const savedDeptUserId = getCookie('dept_user_id');
+    
+    if (savedDesignerAuth === 'true') {
+      setIsDesigner(true);
+    }
+    
+    if (savedDeptUserId && departmentUsers.length > 0) {
+      const user = departmentUsers.find(u => u.id === savedDeptUserId);
+      if (user) {
+        setLoggedInDeptUser(user);
+      }
+    }
+  }, [departmentUsers]);
 
   // --- EmailJS Initialization ---
   useEffect(() => {
@@ -459,13 +477,19 @@ function App() {
     // If user has designer role, set isDesigner state
     if (user.isDesigner) {
       setIsDesigner(true);
+      setCookie('designer_auth', 'true', 30);
     }
+    // Save user ID to cookie for auto-login
+    setCookie('dept_user_id', user.id, 30);
     addToast(`${user.username} olarak giriş yapıldı.`, 'success');
   };
 
   const handleDepartmentLogout = () => {
     setLoggedInDeptUser(null);
     setIsDesigner(false);
+    // Clear cookies
+    deleteCookie('designer_auth');
+    deleteCookie('dept_user_id');
     addToast('Çıkış yapıldı.', 'info');
   };
 
@@ -669,32 +693,50 @@ function App() {
         <div className="mb-6 flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex flex-col">
-              <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-                {isDesigner ? (
-                  <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm">
-                    Kampanya Yönetimi Takvimi (CRM)
-                  </span>
-                ) : (
-                  <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm font-black uppercase">
-                    {`Takvim: ${currentDepartmentName || 'Misafir Görünümü'}`}
-                  </span>
-                )}
-                {!isDesigner && (
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-md font-normal lowercase">salt okunur</span>
-                )}
-                {isDesigner && users.length === 0 && events.length === 0 && (
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                  {isDesigner ? (
+                    <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm">
+                      Kampanya Yönetimi Takvimi (CRM)
+                    </span>
+                  ) : (
+                    <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm font-black uppercase">
+                      {`Takvim: ${currentDepartmentName || 'Misafir Görünümü'}`}
+                    </span>
+                  )}
+                  {!isDesigner && (
+                    <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-md font-normal lowercase">salt okunur</span>
+                  )}
+                  {isDesigner && users.length === 0 && events.length === 0 && (
+                    <button
+                      onClick={seedDatabase}
+                      className="ml-4 text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-green-200"
+                      title="Veritabanı boş görünüyor. Örnek verileri yüklemek için tıkla."
+                    >
+                      <Database size={12} /> Verileri Yükle
+                    </button>
+                  )}
+                </h1>
+                {isDesigner && loggedInDeptUser && (
                   <button
-                    onClick={seedDatabase}
-                    className="ml-4 text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-green-200"
-                    title="Veritabanı boş görünüyor. Örnek verileri yüklemek için tıkla."
+                    onClick={handleDepartmentLogout}
+                    className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 font-medium"
+                    title="Çıkış Yap"
                   >
-                    <Database size={12} /> Verileri Yükle
+                    <LogOut size={14} /> Çıkış
                   </button>
                 )}
-              </h1>
+              </div>
               {loggedInDeptUser && (
-                <div className="flex items-center gap-2 mt-1 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded">
+                <div className="flex items-center gap-2 mt-1 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded w-fit">
                   <LogIn size={12} /> {currentDepartmentName} Birimi olarak giriş yapıldı
+                  <button
+                    onClick={handleDepartmentLogout}
+                    className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-100 p-1 rounded transition-colors"
+                    title="Çıkış Yap"
+                  >
+                    <LogOut size={12} />
+                  </button>
                 </div>
               )}
               {isSendingEmail && (
@@ -1055,6 +1097,7 @@ function App() {
           users={users}
           isDesigner={isDesigner}
           onEdit={handleEditEvent}
+          onDelete={handleDeleteEvent}
         />
 
         <DepartmentLoginModal
