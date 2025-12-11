@@ -564,16 +564,34 @@ function App() {
         };
 
         try {
-          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
-          addToast(`✅ E-posta gönderildi!`, 'success');
+          console.log('📧 EmailJS Gönderiliyor...', {
+            serviceId: EMAILJS_SERVICE_ID,
+            templateId: EMAILJS_TEMPLATE_ID,
+            publicKey: EMAILJS_PUBLIC_KEY,
+            params: templateParams
+          });
+          
+          const response = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
+          
+          console.log('✅ EmailJS Başarılı:', response);
+          addToast(`✅ E-posta gönderildi: ${assignedUser.email}`, 'success');
         } catch (error: any) {
-          console.error('❌ E-posta Hatası:', error);
+          console.error('❌ EmailJS Hatası:', error);
+          console.error('Hata Detayı:', {
+            message: error.message,
+            text: error.text,
+            status: error.status
+          });
+          
+          const errorMsg = error.text || error.message || 'Bilinmeyen hata';
+          addToast(`❌ E-posta hatası: ${errorMsg}`, 'info');
           addToast('Mail istemcisi açılıyor...', 'info');
+          
           setTimeout(() => {
             const subject = encodeURIComponent(`ACİL: Görev Ataması: ${title} - Kampanya Görev Ataması`);
             const body = encodeURIComponent(`Sayın ${assignedUser.name},\n\n${emailMessage}\n\n----------------\n${footerIdText}`);
             window.location.href = `mailto:${assignedUser.email}?subject=${subject}&body=${body}&importance=High`;
-          }, 1000);
+          }, 2000);
         } finally {
           setIsSendingEmail(false);
         }
