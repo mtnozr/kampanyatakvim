@@ -61,10 +61,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !dateStr) return;
+    if (!title || !dateStr || !assigneeId || !departmentId) {
+      alert('Lütfen tüm zorunlu alanları doldurun!');
+      return;
+    }
 
     const selectedDate = new Date(dateStr);
-    onAdd(title, urgency, selectedDate, assigneeId || undefined, description, departmentId || undefined);
+    onAdd(title, urgency, selectedDate, assigneeId, description, departmentId);
     onClose();
     setTitle('');
     setAssigneeId('');
@@ -100,7 +103,9 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Kampanya Adı <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={title}
@@ -112,7 +117,9 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tarih</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tarih <span className="text-red-500">*</span>
+            </label>
             <input
               type="date"
               value={dateStr}
@@ -124,12 +131,15 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Görev Atanan</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Görev Atanan <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <select
                   value={assigneeId}
                   onChange={(e) => setAssigneeId(e.target.value)}
                   className="w-full px-3 py-2 pl-8 rounded-lg border border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all appearance-none bg-white text-sm"
+                  required
                 >
                   <option value="">Seçiniz</option>
                   {users.map(user => (
@@ -141,12 +151,15 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Talep Eden Birim</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Talep Eden Birim <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <select
                   value={departmentId}
                   onChange={(e) => setDepartmentId(e.target.value)}
                   className="w-full px-3 py-2 pl-8 rounded-lg border border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all appearance-none bg-white text-sm"
+                  required
                 >
                   <option value="">Seçiniz</option>
                   {departments.map(dept => (
@@ -160,7 +173,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, o
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-              <AlertCircle size={14} /> Aciliyet Durumu
+              <AlertCircle size={14} /> Aciliyet Durumu <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(URGENCY_CONFIGS) as UrgencyLevel[]).map((level) => {

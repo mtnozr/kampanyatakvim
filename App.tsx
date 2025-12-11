@@ -205,15 +205,18 @@ function App() {
     const savedDesignerAuth = getCookie('designer_auth');
     const savedDeptUserId = getCookie('dept_user_id');
     
-    if (savedDesignerAuth === 'true') {
-      setIsDesigner(true);
-    }
-    
     if (savedDeptUserId && departmentUsers.length > 0) {
       const user = departmentUsers.find(u => u.id === savedDeptUserId);
       if (user) {
         setLoggedInDeptUser(user);
+        // If user has designer role, set isDesigner state
+        if (user.isDesigner) {
+          setIsDesigner(true);
+        }
       }
+    } else if (savedDesignerAuth === 'true') {
+      // Fallback: if no user but designer auth cookie exists
+      setIsDesigner(true);
     }
   }, [departmentUsers]);
 
@@ -735,7 +738,7 @@ function App() {
                     </button>
                   )}
                 </h1>
-                {isDesigner && loggedInDeptUser && (
+                {(isDesigner || loggedInDeptUser) && (
                   <button
                     onClick={handleDepartmentLogout}
                     className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 font-medium"
