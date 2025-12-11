@@ -95,7 +95,13 @@ function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [viewEvent, setViewEvent] = useState<CalendarEvent | null>(null);
+  // Refactor: Store ID instead of object to ensure reactivity
+  const [viewEventId, setViewEventId] = useState<string | null>(null);
+
+  // Derived state for viewEvent
+  const viewEvent = useMemo(() => {
+    return events.find(e => e.id === viewEventId) || null;
+  }, [events, viewEventId]);
 
   // --- FIREBASE LISTENERS (REAL-TIME SYNC) ---
 
@@ -115,6 +121,7 @@ function App() {
           assigneeId: data.assigneeId,
           description: data.description,
           departmentId: data.departmentId,
+          status: data.status, // Add status field
           date: data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date)
         } as CalendarEvent;
       });
@@ -669,8 +676,8 @@ function App() {
       await setDoc(doc(db, "events", eventId), updateData, { merge: true });
       addToast('Kampanya güncellendi.', 'success');
 
-      // Close the details modal after successful edit
-      setViewEvent(null);
+      // Do NOT close the modal here to allow seeing the status change
+      // setViewEventId(null); 
 
       // Log the edit
       await addDoc(collection(db, "logs"), {
@@ -1111,7 +1118,7 @@ function App() {
                           key={event.id}
                           event={event}
                           user={users.find(u => u.id === event.assigneeId)}
-                          onClick={setViewEvent}
+                          onClick={(e) => setViewEventId(e.id)}
                           isBlurred={isBlurred}
                           isClickable={isClickable}
                         />
@@ -1192,7 +1199,7 @@ function App() {
 
         <EventDetailsModal
           event={viewEvent}
-          onClose={() => setViewEvent(null)}
+          onClose={() => setViewEventId(null)}
           assignee={users.find(u => u.id === viewEvent?.assigneeId)}
           departments={departments}
           users={users}

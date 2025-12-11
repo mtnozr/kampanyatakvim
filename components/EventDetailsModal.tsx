@@ -54,9 +54,10 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   // Urgency config (always fallback to Low if undefined)
   const urgencyConfig = URGENCY_CONFIGS[event.urgency] ?? URGENCY_CONFIGS['Low'];
   
-  // Display config based on Status if exists, otherwise Urgency
-  const displayConfig = (event.status && STATUS_STYLES[event.status]) 
-    ? STATUS_STYLES[event.status] 
+  // Display config based on LOCAL Status state if exists, otherwise Urgency
+  // This allows immediate UI feedback when clicking status buttons
+  const displayConfig = (status && STATUS_STYLES[status]) 
+    ? STATUS_STYLES[status] 
     : urgencyConfig;
 
   const department = departments.find(d => d.id === event.departmentId);
