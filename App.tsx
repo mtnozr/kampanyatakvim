@@ -1044,7 +1044,7 @@ function App() {
                   key={day.toString()}
                   onClick={() => openAddModal(day)}
                   className={`
-                  relative min-h-[120px] p-2 rounded-2xl border transition-all duration-200 group
+                  relative min-h-[120px] p-2 rounded-2xl border transition-colors transition-shadow duration-200 group
                   flex flex-col
                   ${isCurrentMonth
                       ? (isHoliday

@@ -57,8 +57,8 @@ export const EventBadge: React.FC<EventBadgeProps> = ({
         }
       }}
       className={`
-        flex flex-col gap-1 mb-2 group transition-transform 
-        ${isClickable && !isBlurred ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-default'}
+        flex flex-col gap-1 mb-2 group transition-opacity
+        ${isClickable && !isBlurred ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}
         ${isBlurred ? 'opacity-70 grayscale' : ''}
       `}
     >
