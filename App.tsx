@@ -798,7 +798,7 @@ function App() {
                     </button>
                   )}
                 </h1>
-                {(isDesigner || isKampanyaYapan || loggedInDeptUser) && (
+                {(isDesigner || isKampanyaYapan) && !loggedInDeptUser && (
                   <button
                     onClick={handleDepartmentLogout}
                     className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 font-medium"
@@ -1142,7 +1142,7 @@ function App() {
           </div>
         </div> {/* End of printable-calendar */}
 
-        {/* Login/Logout Buttons (Bottom Left) */}
+        {/* Login Button (Bottom Left) - Only show when not logged in */}
         <div className="fixed bottom-4 left-4 z-40 flex gap-2">
           {!loggedInDeptUser && !isDesigner && (
             <button
@@ -1150,14 +1150,6 @@ function App() {
               className="px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-medium bg-teal-600 text-white hover:bg-teal-700 transition-colors"
             >
               <LogIn size={14} /> Birim Girişi
-            </button>
-          )}
-          {loggedInDeptUser && (
-            <button
-              onClick={handleDepartmentLogout}
-              className="px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors"
-            >
-              <LogOut size={14} /> Çıkış
             </button>
           )}
         </div>
