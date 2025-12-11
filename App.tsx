@@ -865,6 +865,15 @@ function App() {
                 <Download size={20} />
               </button>
 
+              {loggedInDeptUser && (
+                <div className="flex flex-col items-end mr-2">
+                  <span className="text-xs font-semibold text-gray-700">{loggedInDeptUser.username}</span>
+                  <span className="text-[10px] text-gray-400 font-medium">
+                    {loggedInDeptUser.isDesigner ? 'Designer' : loggedInDeptUser.isKampanyaYapan ? 'Kampanya Yapan' : 'Personel'}
+                  </span>
+                </div>
+              )}
+
               <button
                 onClick={() => setIsAdminOpen(true)}
                 className="p-2 text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-colors bg-white border border-gray-100 rounded-lg shadow-sm"
