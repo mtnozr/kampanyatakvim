@@ -89,6 +89,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAssignee, setFilterAssignee] = useState<string>('');
   const [filterUrgency, setFilterUrgency] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
 
   // Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -258,15 +259,16 @@ function App() {
 
       const matchesAssignee = filterAssignee ? event.assigneeId === filterAssignee : true;
       const matchesUrgency = filterUrgency ? event.urgency === filterUrgency : true;
+      const matchesStatus = filterStatus ? (event.status || 'Planlandı') === filterStatus : true;
 
       // If a department user searches, they shouldn't find blurred events by content content,
       // but we still need them in the list to render them as "blurred".
       // So if search is active, we might need to filter strict. 
       // BUT for now, let's allow basic filtering and handle "blur" logic in rendering loop.
 
-      return matchesSearch && matchesAssignee && matchesUrgency;
+      return matchesSearch && matchesAssignee && matchesUrgency && matchesStatus;
     });
-  }, [events, searchQuery, filterAssignee, filterUrgency]);
+  }, [events, searchQuery, filterAssignee, filterUrgency, filterStatus]);
 
   // --- Calendar Logic ---
   const calendarDays = useMemo(() => {
@@ -745,9 +747,10 @@ function App() {
     setSearchQuery('');
     setFilterAssignee('');
     setFilterUrgency('');
+    setFilterStatus('');
   };
 
-  const hasActiveFilters = searchQuery || filterAssignee || filterUrgency;
+  const hasActiveFilters = searchQuery || filterAssignee || filterUrgency || filterStatus;
 
   // Render Loading State if Initial Data Fetching
   if (isEventsLoading || isUsersLoading) {
@@ -1001,6 +1004,22 @@ function App() {
                 </select>
               </div>
 
+              <div className="relative">
+                <div className="absolute left-3 top-2.5 w-4 h-4 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                </div>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none transition-all text-sm appearance-none"
+                >
+                  <option value="">Tüm Durumlar</option>
+                  <option value="Planlandı">Planlandı</option>
+                  <option value="Tamamlandı">Tamamlandı</option>
+                  <option value="İptal Edildi">İptal Edildi</option>
+                </select>
+              </div>
+
               <button
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
@@ -1211,6 +1230,13 @@ function App() {
 
         <ToastContainer toasts={toasts} removeToast={removeToast} />
       </div>
+
+      {/* Footer */}
+      <footer className="mt-8 pb-4 text-center">
+        <p className="text-xs text-gray-400">
+          Designed by <span className="font-medium text-gray-500">Metin Özer</span>
+        </p>
+      </footer>
     </div>
   );
 }
