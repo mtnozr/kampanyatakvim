@@ -205,18 +205,17 @@ function App() {
     const savedDesignerAuth = getCookie('designer_auth');
     const savedDeptUserId = getCookie('dept_user_id');
     
+    // First, restore designer state from cookie
+    if (savedDesignerAuth === 'true') {
+      setIsDesigner(true);
+    }
+    
+    // Then, try to restore user from cookie
     if (savedDeptUserId && departmentUsers.length > 0) {
       const user = departmentUsers.find(u => u.id === savedDeptUserId);
       if (user) {
         setLoggedInDeptUser(user);
-        // If user has designer role, set isDesigner state
-        if (user.isDesigner) {
-          setIsDesigner(true);
-        }
       }
-    } else if (savedDesignerAuth === 'true') {
-      // Fallback: if no user but designer auth cookie exists
-      setIsDesigner(true);
     }
   }, [departmentUsers]);
 
