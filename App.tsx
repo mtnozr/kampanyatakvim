@@ -201,16 +201,17 @@ function App() {
   const [isDesigner, setIsDesigner] = useState(false);
 
   // --- Cookie-based Auto Login ---
+  // Restore designer state from cookie (runs once on mount)
   useEffect(() => {
     const savedDesignerAuth = getCookie('designer_auth');
-    const savedDeptUserId = getCookie('dept_user_id');
-    
-    // First, restore designer state from cookie
     if (savedDesignerAuth === 'true') {
       setIsDesigner(true);
     }
-    
-    // Then, try to restore user from cookie
+  }, []);
+
+  // Restore user from cookie when departmentUsers loads
+  useEffect(() => {
+    const savedDeptUserId = getCookie('dept_user_id');
     if (savedDeptUserId && departmentUsers.length > 0) {
       const user = departmentUsers.find(u => u.id === savedDeptUserId);
       if (user) {
