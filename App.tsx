@@ -726,8 +726,8 @@ function App() {
 
   const openAddModal = (date?: Date) => {
     if (!isDesigner) return;
-    setSelectedDateForAdd(date || new Date());
-    setIsModalOpen(true);
+    setSelectedDate(date || new Date());
+    setIsAddModalOpen(true);
   };
 
   const getEventsForDay = (date: Date) => {
