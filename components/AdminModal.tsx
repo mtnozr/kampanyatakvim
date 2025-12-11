@@ -638,14 +638,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         return (
                           <div key={user.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between group hover:shadow-sm transition-all">
                             <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${user.isDesigner ? 'bg-violet-100 text-violet-600' : 'bg-teal-100 text-teal-600'}`}>
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${user.isDesigner ? 'bg-violet-100 text-violet-600' : user.isKampanyaYapan ? 'bg-blue-100 text-blue-600' : 'bg-teal-100 text-teal-600'}`}>
                                 {user.username.charAt(0).toUpperCase()}
                               </div>
                               <div>
                                 <div className="flex items-center gap-2">
                                   <p className="font-semibold text-gray-800 text-sm">{user.username}</p>
+                                  <span className="text-xs text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 font-mono">{user.password}</span>
                                   {user.isDesigner && (
                                     <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-medium">Designer</span>
+                                  )}
+                                  {user.isKampanyaYapan && (
+                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Kampanya Yapan</span>
                                   )}
                                 </div>
                                 <p className="text-xs text-gray-500">{dept ? dept.name : 'Silinmiş Birim'}</p>
