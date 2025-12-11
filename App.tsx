@@ -13,7 +13,7 @@ import {
   startOfWeek
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, LogIn, LogOut, Database, Download } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, LogIn, LogOut, Database, Download, Lock } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -27,6 +27,7 @@ import { LogPopover } from './components/LogPopover';
 import { ToastContainer } from './components/Toast';
 import { EventDetailsModal } from './components/EventDetailsModal';
 import { DepartmentLoginModal } from './components/DepartmentLoginModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { setCookie, getCookie, deleteCookie } from './utils/cookies';
 
 // --- FIREBASE IMPORTS ---
@@ -35,6 +36,7 @@ import {
   collection,
   addDoc,
   deleteDoc,
+  updateDoc,
   doc,
   onSnapshot,
   query,
@@ -89,9 +91,10 @@ function App() {
   const [filterUrgency, setFilterUrgency] = useState<string>('');
 
   // Modals State
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [selectedDateForAdd, setSelectedDateForAdd] = useState<Date>(new Date());
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [viewEvent, setViewEvent] = useState<CalendarEvent | null>(null);
 
   // --- FIREBASE LISTENERS (REAL-TIME SYNC) ---
@@ -517,6 +520,28 @@ function App() {
     addToast('Çıkış yapıldı.', 'info');
   };
 
+  const handleChangePassword = async (newPassword: string) => {
+    if (!loggedInDeptUser) return;
+
+    try {
+      const userRef = doc(db, "departmentUsers", loggedInDeptUser.id);
+      await updateDoc(userRef, {
+        password: newPassword
+      });
+      
+      // Update local state
+      setLoggedInDeptUser({
+        ...loggedInDeptUser,
+        password: newPassword
+      });
+      
+      addToast('Şifreniz başarıyla güncellendi.', 'success');
+    } catch (error) {
+      console.error("Error updating password:", error);
+      throw error;
+    }
+  };
+
   const handleAddEvent = async (
     title: string,
     urgency: UrgencyLevel,
@@ -780,11 +805,17 @@ function App() {
                 <div className="flex items-center gap-2 mt-1 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded w-fit">
                   <LogIn size={12} /> {currentDepartmentName} Birimi olarak giriş yapıldı
                   <button
-                    onClick={handleDepartmentLogout}
-                    className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-100 p-1 rounded transition-colors"
-                    title="Çıkış Yap"
+                    onClick={() => setIsChangePasswordOpen(true)}
+                    className="ml-2 text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded hover:bg-teal-200 flex items-center gap-1"
+                    title="Şifre Değiştir"
                   >
-                    <LogOut size={12} />
+                    <Lock size={10} /> Şifre
+                  </button>
+                  <button
+                    onClick={handleDepartmentLogout}
+                    className="ml-1 text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 flex items-center gap-1"
+                  >
+                    <LogOut size={10} /> Çıkış
                   </button>
                 </div>
               )}
@@ -1116,10 +1147,10 @@ function App() {
         </div>
 
         <AddEventModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
           onAdd={handleAddEvent}
-          initialDate={selectedDateForAdd}
+          initialDate={selectedDate}
           users={users}
           departments={departments}
         />
@@ -1141,6 +1172,13 @@ function App() {
           onDeleteDepartmentUser={handleDeleteDepartmentUser}
           onBulkAddEvents={handleBulkAddEvents}
           onSetIsDesigner={setIsDesigner}
+        />
+
+        <ChangePasswordModal
+          isOpen={isChangePasswordOpen}
+          onClose={() => setIsChangePasswordOpen(false)}
+          currentUser={loggedInDeptUser}
+          onChangePassword={handleChangePassword}
         />
 
         <EventDetailsModal
