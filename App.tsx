@@ -199,15 +199,21 @@ function App() {
   // For now, isDesigner is determined by whether user clicks admin button and logs in with Firebase Auth
   // The main calendar is public by default, but edit functions are protected
   const [isDesigner, setIsDesigner] = useState(false);
+  const [isKampanyaYapan, setIsKampanyaYapan] = useState(false);
 
   // --- Cookie-based Auto Login ---
-  // Restore designer state from cookie (runs once on mount)
+  // Restore designer and kampanya yapan state from cookie (runs once on mount)
   useEffect(() => {
     const savedDesignerAuth = getCookie('designer_auth');
-    console.log('🍪 Cookie Check - designer_auth:', savedDesignerAuth);
+    const savedKampanyaYapanAuth = getCookie('kampanya_yapan_auth');
+    console.log('🍪 Cookie Check - designer_auth:', savedDesignerAuth, 'kampanya_yapan_auth:', savedKampanyaYapanAuth);
     if (savedDesignerAuth === 'true') {
       console.log('✅ Setting isDesigner to true from cookie');
       setIsDesigner(true);
+    }
+    if (savedKampanyaYapanAuth === 'true') {
+      console.log('✅ Setting isKampanyaYapan to true from cookie');
+      setIsKampanyaYapan(true);
     }
   }, []);
 
@@ -452,13 +458,14 @@ function App() {
     }
   };
 
-  const handleAddDepartmentUser = async (username: string, password: string, departmentId: string, isDesignerRole: boolean) => {
+  const handleAddDepartmentUser = async (username: string, password: string, departmentId: string, isDesignerRole: boolean, isKampanyaYapanRole: boolean) => {
     try {
       await addDoc(collection(db, "departmentUsers"), {
         username,
         password,
         departmentId,
         isDesigner: isDesignerRole,
+        isKampanyaYapan: isKampanyaYapanRole,
         createdAt: Timestamp.now()
       });
       addToast(`${username} kullanıcısı eklendi.`, 'success');
@@ -478,7 +485,7 @@ function App() {
 
   const handleDepartmentLogin = (user: DepartmentUser) => {
     console.log('🔐 Login - user:', user);
-    console.log('🔐 Login - user.isDesigner:', user.isDesigner);
+    console.log('🔐 Login - user.isDesigner:', user.isDesigner, 'user.isKampanyaYapan:', user.isKampanyaYapan);
     setLoggedInDeptUser(user);
     setIsDeptLoginOpen(false);
     // If user has designer role, set isDesigner state
@@ -487,17 +494,25 @@ function App() {
       setIsDesigner(true);
       setCookie('designer_auth', 'true', 30);
     }
+    // If user has kampanya yapan role, set isKampanyaYapan state
+    if (user.isKampanyaYapan) {
+      console.log('✅ Setting kampanya yapan cookie');
+      setIsKampanyaYapan(true);
+      setCookie('kampanya_yapan_auth', 'true', 30);
+    }
     // Save user ID to cookie for auto-login
     setCookie('dept_user_id', user.id, 30);
-    console.log('🍪 Cookies set - designer_auth:', getCookie('designer_auth'), 'dept_user_id:', getCookie('dept_user_id'));
+    console.log('🍪 Cookies set - designer_auth:', getCookie('designer_auth'), 'kampanya_yapan_auth:', getCookie('kampanya_yapan_auth'), 'dept_user_id:', getCookie('dept_user_id'));
     addToast(`${user.username} olarak giriş yapıldı.`, 'success');
   };
 
   const handleDepartmentLogout = () => {
     setLoggedInDeptUser(null);
     setIsDesigner(false);
+    setIsKampanyaYapan(false);
     // Clear cookies
     deleteCookie('designer_auth');
+    deleteCookie('kampanya_yapan_auth');
     deleteCookie('dept_user_id');
     addToast('Çıkış yapıldı.', 'info');
   };
@@ -726,13 +741,20 @@ function App() {
                     <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm">
                       Kampanya Yönetimi Takvimi (CRM)
                     </span>
+                  ) : isKampanyaYapan ? (
+                    <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm">
+                      Kampanya Yapan Görünümü
+                    </span>
                   ) : (
                     <span className="bg-gradient-to-r from-violet-700 via-indigo-700 to-violet-500 bg-clip-text text-transparent drop-shadow-sm font-black">
                       {`Takvim: ${(currentDepartmentName || 'Misafir Görünümü').toLocaleUpperCase('tr-TR')}`}
                     </span>
                   )}
-                  {!isDesigner && (
+                  {!isDesigner && !isKampanyaYapan && (
                     <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-md font-normal lowercase">salt okunur</span>
+                  )}
+                  {isKampanyaYapan && (
+                    <span className="text-xs bg-blue-200 text-blue-600 px-2 py-0.5 rounded-md font-normal lowercase">görüntüleme</span>
                   )}
                   {isDesigner && users.length === 0 && events.length === 0 && (
                     <button
@@ -744,7 +766,7 @@ function App() {
                     </button>
                   )}
                 </h1>
-                {(isDesigner || loggedInDeptUser) && (
+                {(isDesigner || isKampanyaYapan || loggedInDeptUser) && (
                   <button
                     onClick={handleDepartmentLogout}
                     className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 font-medium"
@@ -1012,6 +1034,7 @@ function App() {
                       const isMyDeptInfo = currentDepartmentId && event.departmentId === currentDepartmentId;
 
                       // Designer: Everything clear, everything clickable
+                      // Kampanya Yapan: Everything clear, clickable to view (but not edit)
                       // Department User: 
                       //    - Own Dept: Clear, NOT clickable (read-only)
                       //    - Other Dept: Blurred, NOT clickable
@@ -1021,6 +1044,10 @@ function App() {
                       let isClickable = false;
 
                       if (isDesigner) {
+                        isBlurred = false;
+                        isClickable = true;
+                      } else if (isKampanyaYapan) {
+                        // Kampanya Yapan: Can see all events, can click to view details (but not edit)
                         isBlurred = false;
                         isClickable = true;
                       } else if (loggedInDeptUser) {

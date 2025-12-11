@@ -20,7 +20,7 @@ interface AdminModalProps {
   onAddDepartment: (name: string) => void;
   onDeleteDepartment: (id: string) => void;
   departmentUsers: DepartmentUser[];
-  onAddDepartmentUser: (username: string, password: string, departmentId: string, isDesigner: boolean) => void;
+  onAddDepartmentUser: (username: string, password: string, departmentId: string, isDesigner: boolean, isKampanyaYapan: boolean) => void;
   onDeleteDepartmentUser: (id: string) => void;
   onBulkAddEvents: (events: Partial<CalendarEvent>[]) => Promise<void>;
   onSetIsDesigner: (value: boolean) => void;
@@ -66,6 +66,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [newDeptPassword, setNewDeptPassword] = useState('');
   const [newDeptUserDeptId, setNewDeptUserDeptId] = useState('');
   const [newDeptUserIsDesigner, setNewDeptUserIsDesigner] = useState(false);
+  const [newDeptUserIsKampanyaYapan, setNewDeptUserIsKampanyaYapan] = useState(false);
 
   const [error, setError] = useState('');
 
@@ -169,11 +170,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return;
     }
 
-    onAddDepartmentUser(newDeptUsername, newDeptPassword, newDeptUserDeptId, newDeptUserIsDesigner);
+    onAddDepartmentUser(newDeptUsername, newDeptPassword, newDeptUserDeptId, newDeptUserIsDesigner, newDeptUserIsKampanyaYapan);
     setNewDeptUsername('');
     setNewDeptPassword('');
     setNewDeptUserDeptId('');
     setNewDeptUserIsDesigner(false);
+    setNewDeptUserIsKampanyaYapan(false);
     setError('');
   };
 
@@ -585,16 +587,32 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           </select>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-2">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={newDeptUserIsDesigner}
-                            onChange={(e) => setNewDeptUserIsDesigner(e.target.checked)}
+                            onChange={(e) => {
+                              setNewDeptUserIsDesigner(e.target.checked);
+                              if (e.target.checked) setNewDeptUserIsKampanyaYapan(false);
+                            }}
                             className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
                           />
                           <span className="text-sm text-gray-700">Designer Yetkisi Ver</span>
                           <span className="text-[10px] text-gray-400">(Kampanya düzenleme izni)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newDeptUserIsKampanyaYapan}
+                            onChange={(e) => {
+                              setNewDeptUserIsKampanyaYapan(e.target.checked);
+                              if (e.target.checked) setNewDeptUserIsDesigner(false);
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">Kampanya Yapan Yetkisi Ver</span>
+                          <span className="text-[10px] text-gray-400">(Tüm kampanyaları görüntüleme izni)</span>
                         </label>
                       </div>
                       <div className="flex justify-between items-center">

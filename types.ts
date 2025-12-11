@@ -56,5 +56,6 @@ export interface DepartmentUser {
   password: string;
   departmentId: string;
   isDesigner?: boolean;
+  isKampanyaYapan?: boolean;
   createdAt: Date;
 }
