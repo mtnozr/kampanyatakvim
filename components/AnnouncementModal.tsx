@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Megaphone, Plus, Trash2, Calendar } from 'lucide-react';
 import { Announcement } from '../types';
 import { format, isToday } from 'date-fns';
@@ -39,9 +39,15 @@ export default function AnnouncementModal({
     setIsAddMode(false);
   };
 
-  const sortedAnnouncements = [...announcements].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  );
+  const sortedAnnouncements = useMemo(() => {
+    if (!announcements) return [];
+    return [...announcements].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
+  }, [announcements]);
+
+  // Track processed IDs to prevent infinite loops/duplicate requests
+  const processingIds = useRef<Set<string>>(new Set());
 
   // Mark unread announcements as read when modal opens
   useEffect(() => {
@@ -49,7 +55,9 @@ export default function AnnouncementModal({
       sortedAnnouncements.forEach((announcement) => {
         const isUnread = isToday(announcement.createdAt) && 
           !(announcement.readBy || []).includes(currentUserId);
-        if (isUnread) {
+        
+        if (isUnread && !processingIds.current.has(announcement.id)) {
+          processingIds.current.add(announcement.id);
           onMarkAsRead(announcement.id);
         }
       });
