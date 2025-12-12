@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   format,
   addMonths,
@@ -711,11 +711,14 @@ function App() {
     }
   };
 
-  const handleMarkAnnouncementAsRead = async (announcementId: string) => {
+  const handleMarkAnnouncementAsRead = useCallback(async (announcementId: string) => {
     if (!loggedInDeptUser?.id) return;
     try {
+      // Optimistic update prevention or check
       const announcement = announcements.find(a => a.id === announcementId);
-      const currentReadBy = announcement?.readBy || [];
+      if (!announcement) return;
+      
+      const currentReadBy = announcement.readBy || [];
       if (!currentReadBy.includes(loggedInDeptUser.id)) {
         await updateDoc(doc(db, "announcements", announcementId), {
           readBy: [...currentReadBy, loggedInDeptUser.id]
@@ -724,7 +727,7 @@ function App() {
     } catch (e) {
       console.error('Mark as read error:', e);
     }
-  };
+  }, [announcements, loggedInDeptUser]);
 
   const handleEditEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
     try {

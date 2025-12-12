@@ -61,23 +61,34 @@ export default function AnnouncementModal({
   // Mark unread announcements as read when modal opens
   useEffect(() => {
     if (isOpen && currentUserId && announcements.length > 0) {
+      console.log('📢 AnnouncementModal: Checking for unread announcements...');
+      
       const unprocessedAnnouncements = announcements.filter(a => {
         const date = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
-        if (isNaN(date.getTime())) return false; // Geçersiz tarihli kayıtları atla
+        if (isNaN(date.getTime())) return false; 
 
         const isUnread = isToday(date) && 
           !(a.readBy || []).includes(currentUserId);
         
+        // Debug log for unread items
+        if (isUnread) {
+             console.log(`📝 Found unread announcement: ${a.id}`);
+        }
+        
         return isUnread && !processingIds.current.has(a.id);
       });
 
+      if (unprocessedAnnouncements.length === 0) {
+        console.log('✅ No new announcements to mark as read.');
+      }
+
       unprocessedAnnouncements.forEach((announcement) => {
+        console.log(`🔄 Marking as read: ${announcement.id}`);
         processingIds.current.add(announcement.id);
-        // Hata yakalama bloğu ekleyelim ki tek bir hata tüm uygulamayı çökertmesin
         try {
           onMarkAsRead(announcement.id);
         } catch (error) {
-          console.error("Duyuru okundu işaretlenirken hata:", error);
+          console.error("❌ Error marking announcement as read:", error);
         }
       });
     }
