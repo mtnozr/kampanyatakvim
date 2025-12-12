@@ -13,11 +13,11 @@ import {
   startOfWeek
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, LogIn, LogOut, Database, Download, Lock } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, Plus, Users, ClipboardList, Loader2, Search, Filter, X, LogIn, LogOut, Database, Download, Lock, Megaphone } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { CalendarEvent, UrgencyLevel, User, AppNotification, ToastMessage, ActivityLog, Department, DepartmentUser } from './types';
+import { CalendarEvent, UrgencyLevel, User, AppNotification, ToastMessage, ActivityLog, Department, DepartmentUser, Announcement } from './types';
 import { INITIAL_EVENTS, DAYS_OF_WEEK, INITIAL_USERS, URGENCY_CONFIGS, TURKISH_HOLIDAYS, INITIAL_DEPARTMENTS } from './constants';
 import { EventBadge } from './components/EventBadge';
 import { AddEventModal } from './components/AddEventModal';
@@ -28,6 +28,7 @@ import { ToastContainer } from './components/Toast';
 import { EventDetailsModal } from './components/EventDetailsModal';
 import { DepartmentLoginModal } from './components/DepartmentLoginModal';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
+import AnnouncementModal from './components/AnnouncementModal';
 import { setCookie, getCookie, deleteCookie } from './utils/cookies';
 
 // --- FIREBASE IMPORTS ---
@@ -95,6 +96,10 @@ function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
+
+  // Announcements State
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   // Refactor: Store ID instead of object to ensure reactivity
   const [viewEventId, setViewEventId] = useState<string | null>(null);
@@ -190,6 +195,20 @@ function App() {
         timestamp: doc.data().timestamp instanceof Timestamp ? doc.data().timestamp.toDate() : new Date()
       } as ActivityLog));
       setLogs(fetchedLogs);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 7. Sync Announcements
+  useEffect(() => {
+    const q = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedAnnouncements: Announcement[] = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        createdAt: doc.data().createdAt instanceof Timestamp ? doc.data().createdAt.toDate() : new Date()
+      } as Announcement));
+      setAnnouncements(fetchedAnnouncements);
     });
     return () => unsubscribe();
   }, []);
@@ -666,6 +685,32 @@ function App() {
     }
   };
 
+  // --- Announcement Handlers ---
+  const handleAddAnnouncement = async (title: string, content: string) => {
+    try {
+      await addDoc(collection(db, "announcements"), {
+        title,
+        content,
+        createdAt: Timestamp.now(),
+        createdBy: loggedInDeptUser?.username || 'Admin'
+      });
+      addToast('Duyuru yayınlandı.', 'success');
+    } catch (e) {
+      console.error('Announcement add error:', e);
+      addToast('Duyuru eklenemedi.', 'info');
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "announcements", id));
+      addToast('Duyuru silindi.', 'info');
+    } catch (e) {
+      console.error('Announcement delete error:', e);
+      addToast('Duyuru silinemedi.', 'info');
+    }
+  };
+
   const handleEditEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
     try {
       const updateData: any = { ...updates };
@@ -874,6 +919,20 @@ function App() {
               >
                 <Download size={20} />
               </button>
+
+              {/* Announcements Button - visible to Designer and Kampanya Yapan */}
+              {(isDesigner || isKampanyaYapan) && (
+                <button
+                  onClick={() => setIsAnnouncementOpen(true)}
+                  className="relative p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition-colors bg-white border border-gray-100 rounded-lg shadow-sm"
+                  title="Duyurular"
+                >
+                  <Megaphone size={20} />
+                  {announcements.some(a => isToday(a.createdAt)) && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full animate-pulse"></span>
+                  )}
+                </button>
+              )}
 
               {loggedInDeptUser && (
                 <div className="flex flex-col items-end mr-2">
@@ -1226,6 +1285,15 @@ function App() {
           departmentUsers={departmentUsers}
           departments={departments}
           onLogin={handleDepartmentLogin}
+        />
+
+        <AnnouncementModal
+          isOpen={isAnnouncementOpen}
+          onClose={() => setIsAnnouncementOpen(false)}
+          announcements={announcements}
+          isDesigner={isDesigner}
+          onAdd={handleAddAnnouncement}
+          onDelete={handleDeleteAnnouncement}
         />
 
         <ToastContainer toasts={toasts} removeToast={removeToast} />
