@@ -723,6 +723,11 @@ function App() {
         await updateDoc(doc(db, "announcements", announcementId), {
           readBy: [...currentReadBy, loggedInDeptUser.id]
         });
+        setAnnouncements(prev => prev.map(a => 
+          a.id === announcementId 
+            ? { ...a, readBy: [...(a.readBy || []), loggedInDeptUser.id] } 
+            : a
+        ));
       }
     } catch (e) {
       console.error('Mark as read error:', e);

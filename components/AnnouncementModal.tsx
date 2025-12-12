@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { X, Megaphone, Plus, Trash2, Calendar } from 'lucide-react';
 import { Announcement } from '../types';
 import { format, isToday } from 'date-fns';
@@ -55,44 +55,7 @@ export default function AnnouncementModal({
     });
   }, [announcements]);
 
-  // Track processed IDs to prevent infinite loops/duplicate requests
-  const processingIds = useRef<Set<string>>(new Set());
-
-  // Mark unread announcements as read when modal opens
-  useEffect(() => {
-    if (isOpen && currentUserId && announcements.length > 0) {
-      console.log('📢 AnnouncementModal: Checking for unread announcements...');
-      
-      const unprocessedAnnouncements = announcements.filter(a => {
-        const date = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
-        if (isNaN(date.getTime())) return false; 
-
-        const isUnread = isToday(date) && 
-          !(a.readBy || []).includes(currentUserId);
-        
-        // Debug log for unread items
-        if (isUnread) {
-             console.log(`📝 Found unread announcement: ${a.id}`);
-        }
-        
-        return isUnread && !processingIds.current.has(a.id);
-      });
-
-      if (unprocessedAnnouncements.length === 0) {
-        console.log('✅ No new announcements to mark as read.');
-      }
-
-      unprocessedAnnouncements.forEach((announcement) => {
-        console.log(`🔄 Marking as read: ${announcement.id}`);
-        processingIds.current.add(announcement.id);
-        try {
-          onMarkAsRead(announcement.id);
-        } catch (error) {
-          console.error("❌ Error marking announcement as read:", error);
-        }
-      });
-    }
-  }, [isOpen, currentUserId, announcements, onMarkAsRead]);
+  
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -172,53 +135,59 @@ export default function AnnouncementModal({
             </div>
           ) : (
             <div className="space-y-3">
-              {sortedAnnouncements.map((announcement) => (
-                <div
-                  key={announcement.id}
-                  className={`p-4 rounded-xl border ${
-                    isToday(announcement.createdAt instanceof Date ? announcement.createdAt : new Date(announcement.createdAt || 0)) && 
-                    currentUserId && 
-                    !(announcement.readBy || []).includes(currentUserId)
-                      ? 'bg-amber-50 border-amber-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-800 text-sm">
-                          {announcement.title}
-                        </h3>
-                        {isToday(announcement.createdAt instanceof Date ? announcement.createdAt : new Date(announcement.createdAt || 0)) && 
-                          currentUserId && 
-                          !(announcement.readBy || []).includes(currentUserId) && (
-                          <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-medium">
-                            YENİ
-                          </span>
-                        )}
+              {sortedAnnouncements.map((announcement) => {
+                const date = announcement.createdAt instanceof Date ? announcement.createdAt : new Date(announcement.createdAt || 0);
+                const isUnread = !isNaN(date.getTime()) && isToday(date) && !!currentUserId && !(announcement.readBy || []).includes(currentUserId!);
+
+                return (
+                  <div
+                    key={announcement.id}
+                    onClick={() => {
+                      if (currentUserId && !isNaN(date.getTime()) && isToday(date) && !(announcement.readBy || []).includes(currentUserId)) {
+                        onMarkAsRead(announcement.id);
+                      }
+                    }}
+                    className={`p-4 rounded-xl border ${
+                      isUnread
+                        ? 'bg-amber-50 border-amber-200'
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-gray-800 text-sm">
+                            {announcement.title}
+                          </h3>
+                          {isUnread && (
+                            <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-medium">
+                              YENİ
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                          {announcement.content}
+                        </p>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
+                          <Calendar size={12} />
+                          {format(date, 'd MMMM yyyy, HH:mm', {
+                            locale: tr,
+                          })}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                        {announcement.content}
-                      </p>
-                      <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
-                        <Calendar size={12} />
-                        {format(announcement.createdAt instanceof Date ? announcement.createdAt : new Date(announcement.createdAt || 0), 'd MMMM yyyy, HH:mm', {
-                          locale: tr,
-                        })}
-                      </div>
+                      {isDesigner && (
+                        <button
+                          onClick={() => onDelete(announcement.id)}
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Duyuruyu Sil"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
-                    {isDesigner && (
-                      <button
-                        onClick={() => onDelete(announcement.id)}
-                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Duyuruyu Sil"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
