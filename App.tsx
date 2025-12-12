@@ -946,9 +946,10 @@ function App() {
                   title="Duyurular"
                 >
                   <Megaphone size={20} />
-                  {loggedInDeptUser?.id && announcements.some(a => 
-                    isToday(a.createdAt) && !(a.readBy || []).includes(loggedInDeptUser.id)
-                  ) && (
+                  {loggedInDeptUser?.id && announcements.some(a => {
+                    const date = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
+                    return !isNaN(date.getTime()) && isToday(date) && !(a.readBy || []).includes(loggedInDeptUser.id);
+                  }) && (
                     <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full animate-pulse"></span>
                   )}
                 </button>
