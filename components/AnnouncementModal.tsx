@@ -40,10 +40,19 @@ export default function AnnouncementModal({
   };
 
   const sortedAnnouncements = useMemo(() => {
-    if (!announcements) return [];
-    return [...announcements].sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    if (!announcements || !Array.isArray(announcements)) return [];
+    
+    return [...announcements].sort((a, b) => {
+      // Güvenli tarih dönüşümü
+      const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
+      const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt || 0);
+      
+      // Geçersiz tarih kontrolü
+      const timeA = !isNaN(dateA.getTime()) ? dateA.getTime() : 0;
+      const timeB = !isNaN(dateB.getTime()) ? dateB.getTime() : 0;
+      
+      return timeB - timeA;
+    });
   }, [announcements]);
 
   // Track processed IDs to prevent infinite loops/duplicate requests
@@ -51,18 +60,28 @@ export default function AnnouncementModal({
 
   // Mark unread announcements as read when modal opens
   useEffect(() => {
-    if (isOpen && currentUserId) {
-      sortedAnnouncements.forEach((announcement) => {
-        const isUnread = isToday(announcement.createdAt) && 
-          !(announcement.readBy || []).includes(currentUserId);
+    if (isOpen && currentUserId && announcements.length > 0) {
+      const unprocessedAnnouncements = announcements.filter(a => {
+        const date = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
+        if (isNaN(date.getTime())) return false; // Geçersiz tarihli kayıtları atla
+
+        const isUnread = isToday(date) && 
+          !(a.readBy || []).includes(currentUserId);
         
-        if (isUnread && !processingIds.current.has(announcement.id)) {
-          processingIds.current.add(announcement.id);
+        return isUnread && !processingIds.current.has(a.id);
+      });
+
+      unprocessedAnnouncements.forEach((announcement) => {
+        processingIds.current.add(announcement.id);
+        // Hata yakalama bloğu ekleyelim ki tek bir hata tüm uygulamayı çökertmesin
+        try {
           onMarkAsRead(announcement.id);
+        } catch (error) {
+          console.error("Duyuru okundu işaretlenirken hata:", error);
         }
       });
     }
-  }, [isOpen, currentUserId, sortedAnnouncements, onMarkAsRead]);
+  }, [isOpen, currentUserId, announcements, onMarkAsRead]);
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -146,7 +165,7 @@ export default function AnnouncementModal({
                 <div
                   key={announcement.id}
                   className={`p-4 rounded-xl border ${
-                    isToday(announcement.createdAt) && 
+                    isToday(announcement.createdAt instanceof Date ? announcement.createdAt : new Date(announcement.createdAt || 0)) && 
                     currentUserId && 
                     !(announcement.readBy || []).includes(currentUserId)
                       ? 'bg-amber-50 border-amber-200'
@@ -159,7 +178,7 @@ export default function AnnouncementModal({
                         <h3 className="font-semibold text-gray-800 text-sm">
                           {announcement.title}
                         </h3>
-                        {isToday(announcement.createdAt) && 
+                        {isToday(announcement.createdAt instanceof Date ? announcement.createdAt : new Date(announcement.createdAt || 0)) && 
                           currentUserId && 
                           !(announcement.readBy || []).includes(currentUserId) && (
                           <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-medium">
@@ -172,7 +191,7 @@ export default function AnnouncementModal({
                       </p>
                       <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
                         <Calendar size={12} />
-                        {format(announcement.createdAt, 'd MMMM yyyy, HH:mm', {
+                        {format(announcement.createdAt instanceof Date ? announcement.createdAt : new Date(announcement.createdAt || 0), 'd MMMM yyyy, HH:mm', {
                           locale: tr,
                         })}
                       </div>
