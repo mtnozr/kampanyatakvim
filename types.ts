@@ -69,4 +69,5 @@ export interface Announcement {
   content: string;
   createdAt: Date;
   createdBy: string;
+  readBy?: string[]; // Array of user IDs who have read this announcement
 }

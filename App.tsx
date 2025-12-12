@@ -711,6 +711,21 @@ function App() {
     }
   };
 
+  const handleMarkAnnouncementAsRead = async (announcementId: string) => {
+    if (!loggedInDeptUser?.id) return;
+    try {
+      const announcement = announcements.find(a => a.id === announcementId);
+      const currentReadBy = announcement?.readBy || [];
+      if (!currentReadBy.includes(loggedInDeptUser.id)) {
+        await updateDoc(doc(db, "announcements", announcementId), {
+          readBy: [...currentReadBy, loggedInDeptUser.id]
+        });
+      }
+    } catch (e) {
+      console.error('Mark as read error:', e);
+    }
+  };
+
   const handleEditEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
     try {
       const updateData: any = { ...updates };
@@ -928,7 +943,9 @@ function App() {
                   title="Duyurular"
                 >
                   <Megaphone size={20} />
-                  {announcements.some(a => isToday(a.createdAt)) && (
+                  {loggedInDeptUser?.id && announcements.some(a => 
+                    isToday(a.createdAt) && !(a.readBy || []).includes(loggedInDeptUser.id)
+                  ) && (
                     <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full animate-pulse"></span>
                   )}
                 </button>
@@ -1292,8 +1309,10 @@ function App() {
           onClose={() => setIsAnnouncementOpen(false)}
           announcements={announcements}
           isDesigner={isDesigner}
+          currentUserId={loggedInDeptUser?.id || null}
           onAdd={handleAddAnnouncement}
           onDelete={handleDeleteAnnouncement}
+          onMarkAsRead={handleMarkAnnouncementAsRead}
         />
 
         <ToastContainer toasts={toasts} removeToast={removeToast} />

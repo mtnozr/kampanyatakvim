@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Megaphone, Plus, Trash2, Calendar } from 'lucide-react';
 import { Announcement } from '../types';
 import { format, isToday } from 'date-fns';
@@ -9,8 +9,10 @@ interface AnnouncementModalProps {
   onClose: () => void;
   announcements: Announcement[];
   isDesigner: boolean;
+  currentUserId: string | null;
   onAdd: (title: string, content: string) => void;
   onDelete: (id: string) => void;
+  onMarkAsRead: (announcementId: string) => void;
 }
 
 export default function AnnouncementModal({
@@ -18,8 +20,10 @@ export default function AnnouncementModal({
   onClose,
   announcements,
   isDesigner,
+  currentUserId,
   onAdd,
   onDelete,
+  onMarkAsRead,
 }: AnnouncementModalProps) {
   const [isAddMode, setIsAddMode] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -38,6 +42,19 @@ export default function AnnouncementModal({
   const sortedAnnouncements = [...announcements].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
+
+  // Mark unread announcements as read when modal opens
+  useEffect(() => {
+    if (isOpen && currentUserId) {
+      sortedAnnouncements.forEach((announcement) => {
+        const isUnread = isToday(announcement.createdAt) && 
+          !(announcement.readBy || []).includes(currentUserId);
+        if (isUnread) {
+          onMarkAsRead(announcement.id);
+        }
+      });
+    }
+  }, [isOpen, currentUserId, sortedAnnouncements, onMarkAsRead]);
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -121,7 +138,9 @@ export default function AnnouncementModal({
                 <div
                   key={announcement.id}
                   className={`p-4 rounded-xl border ${
-                    isToday(announcement.createdAt)
+                    isToday(announcement.createdAt) && 
+                    currentUserId && 
+                    !(announcement.readBy || []).includes(currentUserId)
                       ? 'bg-amber-50 border-amber-200'
                       : 'bg-gray-50 border-gray-200'
                   }`}
@@ -132,7 +151,9 @@ export default function AnnouncementModal({
                         <h3 className="font-semibold text-gray-800 text-sm">
                           {announcement.title}
                         </h3>
-                        {isToday(announcement.createdAt) && (
+                        {isToday(announcement.createdAt) && 
+                          currentUserId && 
+                          !(announcement.readBy || []).includes(currentUserId) && (
                           <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-medium">
                             YENİ
                           </span>
