@@ -23,6 +23,8 @@ export interface CalendarEvent {
   assigneeId?: string; // ID of the assigned User
   departmentId?: string; // ID of the requesting Department
   status?: CampaignStatus;
+  createdAt?: Date;
+  completedAt?: Date;
 }
 
 export interface UrgencyConfig {

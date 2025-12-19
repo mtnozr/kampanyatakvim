@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, User as UserIcon, AlertCircle, AlignLeft, Building, Edit2, Save, XCircle, Trash2, CheckCircle2, XCircle as CancelIcon, Clock } from 'lucide-react';
 import { CalendarEvent, User, Department, UrgencyLevel, CampaignStatus } from '../types';
 import { URGENCY_CONFIGS, STATUS_STYLES } from '../constants';
-import { format } from 'date-fns';
+import { format, intervalToDuration, formatDuration } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
 interface EventDetailsModalProps {
@@ -105,6 +105,19 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     }
   };
 
+  const formatTimeElapsed = (start: Date, end: Date) => {
+    const duration = intervalToDuration({ start, end });
+    // If less than a minute
+    if (duration.days === 0 && duration.hours === 0 && duration.minutes === 0) {
+      return 'Az önce';
+    }
+    return formatDuration(duration, {
+      format: ['years', 'months', 'days', 'hours', 'minutes'],
+      locale: tr,
+      delimiter: ' '
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 flex flex-col max-h-[90vh]">
@@ -199,6 +212,34 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Time Elapsed / Completion Time Section */}
+          {(event.createdAt) && (status !== 'İptal Edildi') && (
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                <Clock size={20} />
+              </div>
+              <div className="flex-1">
+                {status === 'Tamamlandı' ? (
+                  <>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tamamlanma Süresi</p>
+                    <p className="text-gray-800 font-medium">
+                      {event.completedAt 
+                        ? formatTimeElapsed(event.createdAt, event.completedAt) 
+                        : formatTimeElapsed(event.createdAt, new Date())}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Geçen Süre</p>
+                    <p className="text-gray-800 font-medium">
+                      {formatTimeElapsed(event.createdAt, new Date())}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Department Section */}
           <div className="flex items-start gap-3">

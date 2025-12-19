@@ -128,6 +128,8 @@ function App() {
           description: data.description,
           departmentId: data.departmentId,
           status: data.status, // Add status field
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : undefined),
+          completedAt: data.completedAt instanceof Timestamp ? data.completedAt.toDate() : (data.completedAt ? new Date(data.completedAt) : undefined),
           date: data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date)
         } as CalendarEvent;
       });
@@ -585,7 +587,9 @@ function App() {
       urgency,
       assigneeId,
       description,
-      departmentId
+      departmentId,
+      createdAt: Timestamp.now(),
+      status: 'Planlandı'
     };
 
     let newEventId = "";
@@ -741,6 +745,16 @@ function App() {
       // Convert Date to Timestamp if date is being updated
       if (updates.date && updates.date instanceof Date) {
         updateData.date = Timestamp.fromDate(updates.date);
+      }
+
+      // Handle completion time logic
+      if (updates.status) {
+        if (updates.status === 'Tamamlandı') {
+          updateData.completedAt = Timestamp.now();
+        } else {
+          // Reset completedAt if status is changed from Completed to something else
+          updateData.completedAt = null; 
+        }
       }
 
       await setDoc(doc(db, "events", eventId), updateData, { merge: true });
